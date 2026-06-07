@@ -7,7 +7,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/spf13/cobra"
 
-	"github.com/jmcadams/ports/internal/config"
+	"github.com/joshmcadams/ports/internal/config"
 )
 
 func newConfigCmd() *cobra.Command {

@@ -4,8 +4,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 
-	"github.com/jmcadams/ports/internal/config"
-	"github.com/jmcadams/ports/internal/tui"
+	"github.com/joshmcadams/ports/internal/config"
+	"github.com/joshmcadams/ports/internal/tui"
 )
 
 func newTUICmd() *cobra.Command {

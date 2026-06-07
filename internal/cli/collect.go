@@ -1,9 +1,9 @@
 package cli
 
 import (
-	"github.com/jmcadams/ports/internal/config"
-	"github.com/jmcadams/ports/internal/inventory"
-	"github.com/jmcadams/ports/internal/model"
+	"github.com/joshmcadams/ports/internal/config"
+	"github.com/joshmcadams/ports/internal/inventory"
+	"github.com/joshmcadams/ports/internal/model"
 )
 
 // collect returns the full merged inventory (native + Docker), unfiltered.

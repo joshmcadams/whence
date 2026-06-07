@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jmcadams/ports/internal/model"
-	"github.com/jmcadams/ports/internal/project"
+	"github.com/joshmcadams/ports/internal/model"
+	"github.com/joshmcadams/ports/internal/project"
 )
 
 // confidence levels for container-backed servers.

@@ -7,10 +7,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/jmcadams/ports/internal/config"
-	"github.com/jmcadams/ports/internal/inventory"
-	"github.com/jmcadams/ports/internal/model"
-	"github.com/jmcadams/ports/internal/output"
+	"github.com/joshmcadams/ports/internal/config"
+	"github.com/joshmcadams/ports/internal/inventory"
+	"github.com/joshmcadams/ports/internal/model"
+	"github.com/joshmcadams/ports/internal/output"
 )
 
 type listOpts struct {

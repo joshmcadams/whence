@@ -16,7 +16,7 @@ import (
 
 	"github.com/shirou/gopsutil/v4/process"
 
-	"github.com/jmcadams/ports/internal/model"
+	"github.com/joshmcadams/ports/internal/model"
 )
 
 // Opts controls kill behavior.

@@ -10,7 +10,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/jmcadams/ports/internal/model"
+	"github.com/joshmcadams/ports/internal/model"
 )
 
 // manifests are non-.git markers that also indicate a project root, in priority

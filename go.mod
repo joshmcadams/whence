@@ -1,4 +1,4 @@
-module github.com/jmcadams/ports
+module github.com/joshmcadams/ports
 
 go 1.26.1
 

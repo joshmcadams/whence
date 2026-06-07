@@ -13,11 +13,11 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/jmcadams/ports/internal/config"
-	"github.com/jmcadams/ports/internal/inventory"
-	"github.com/jmcadams/ports/internal/kill"
-	pm "github.com/jmcadams/ports/internal/model"
-	"github.com/jmcadams/ports/internal/output"
+	"github.com/joshmcadams/ports/internal/config"
+	"github.com/joshmcadams/ports/internal/inventory"
+	"github.com/joshmcadams/ports/internal/kill"
+	pm "github.com/joshmcadams/ports/internal/model"
+	"github.com/joshmcadams/ports/internal/output"
 )
 
 const refreshInterval = 5 * time.Second

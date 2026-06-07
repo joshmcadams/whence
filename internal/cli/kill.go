@@ -10,9 +10,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/jmcadams/ports/internal/config"
-	"github.com/jmcadams/ports/internal/kill"
-	"github.com/jmcadams/ports/internal/model"
+	"github.com/joshmcadams/ports/internal/config"
+	"github.com/joshmcadams/ports/internal/kill"
+	"github.com/joshmcadams/ports/internal/model"
 )
 
 type killOpts struct {

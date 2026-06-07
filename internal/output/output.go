@@ -8,7 +8,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/jmcadams/ports/internal/model"
+	"github.com/joshmcadams/ports/internal/model"
 )
 
 // JSON writes servers as indented JSON.

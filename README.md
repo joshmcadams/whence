@@ -27,29 +27,29 @@ PORT  PROTO  PID     UPTIME  SRC     SERVER  DESCRIPTION
 
 ## Install
 
-> The module path and release owner currently use `jmcadams`. If your GitHub
+> The module path and release owner currently use `joshmcadams`. If your GitHub
 > username/repo differ, update the module path in `go.mod`, the `-X` ldflags
 > path, and the owners in `.goreleaser.yaml` before releasing.
 
 **From source** (Go 1.26+):
 
 ```sh
-go install github.com/jmcadams/ports/cmd/ports@latest
+go install github.com/joshmcadams/ports/cmd/ports@latest
 ```
 
 **Prebuilt binaries:** download from the
-[releases page](https://github.com/jmcadams/ports/releases).
+[releases page](https://github.com/joshmcadams/ports/releases).
 
 **Homebrew** (after a release):
 
 ```sh
-brew install --cask jmcadams/tap/ports
+brew install --cask joshmcadams/tap/ports
 ```
 
 **Scoop** (Windows):
 
 ```sh
-scoop bucket add jmcadams https://github.com/jmcadams/scoop-bucket
+scoop bucket add joshmcadams https://github.com/joshmcadams/scoop-bucket
 scoop install ports
 ```
 

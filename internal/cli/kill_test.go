@@ -3,7 +3,7 @@ package cli
 import (
 	"testing"
 
-	"github.com/jmcadams/ports/internal/model"
+	"github.com/joshmcadams/ports/internal/model"
 )
 
 func sample() []model.Server {
