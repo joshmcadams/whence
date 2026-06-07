@@ -1,0 +1,108 @@
+// Package scan enumerates listening TCP ports and the processes behind them.
+package scan
+
+import (
+	"fmt"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+
+	gnet "github.com/shirou/gopsutil/v4/net"
+	"github.com/shirou/gopsutil/v4/process"
+
+	"github.com/jmcadams/ports/internal/model"
+)
+
+// Processes scans all listening TCP sockets and returns one Server per
+// (port, proto, pid). Errors fetching details for an individual process are
+// recorded in Server.Notes rather than aborting the whole scan.
+func Processes() ([]model.Server, error) {
+	conns, err := gnet.Connections("inet")
+	if err != nil {
+		return nil, fmt.Errorf("enumerate sockets: %w", err)
+	}
+
+	now := time.Now()
+	seen := map[string]bool{}
+	var servers []model.Server
+
+	for _, c := range conns {
+		if strings.ToUpper(c.Status) != "LISTEN" {
+			continue
+		}
+		proto := protoOf(c.Family)
+		key := fmt.Sprintf("%d/%s/%d", c.Laddr.Port, proto, c.Pid)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+
+		s := model.Server{
+			Port:    int(c.Laddr.Port),
+			Proto:   proto,
+			Address: c.Laddr.IP,
+			Source:  model.SourceProcess,
+			PID:     int(c.Pid),
+		}
+		if c.Pid > 0 {
+			enrich(&s, c.Pid, now)
+		} else {
+			s.Notes = append(s.Notes, "no pid (owned by another user; rerun with elevated privileges)")
+		}
+		servers = append(servers, s)
+	}
+
+	sort.Slice(servers, func(i, j int) bool {
+		if servers[i].Port != servers[j].Port {
+			return servers[i].Port < servers[j].Port
+		}
+		return servers[i].Proto < servers[j].Proto
+	})
+	return servers, nil
+}
+
+// enrich fills process-level detail, accumulating non-fatal notes.
+func enrich(s *model.Server, pid int32, now time.Time) {
+	p, err := process.NewProcess(pid)
+	if err != nil {
+		s.Notes = append(s.Notes, "process: "+err.Error())
+		return
+	}
+	if exe, err := p.Exe(); err == nil {
+		s.Exe = exe
+	}
+	// Prefer the executable's basename: gopsutil's Name() reads /proc/pid/comm,
+	// which can be a thread name (e.g. "MainThread" for a node/python server).
+	if s.Exe != "" {
+		s.Name = filepath.Base(s.Exe)
+	} else if name, err := p.Name(); err == nil {
+		s.Name = name
+	}
+	if cmd, err := p.Cmdline(); err == nil {
+		s.Cmdline = cmd
+	}
+	if ppid, err := p.Ppid(); err == nil {
+		s.PPID = int(ppid)
+	}
+	if ms, err := p.CreateTime(); err == nil && ms > 0 {
+		s.StartTime = time.UnixMilli(ms)
+		s.Uptime = now.Sub(s.StartTime)
+	}
+	if cwd, err := processCwd(pid); err == nil && cwd != "" {
+		s.Cwd = cwd
+	} else if err != nil {
+		s.Notes = append(s.Notes, "cwd: "+err.Error())
+	}
+}
+
+func protoOf(family uint32) string {
+	switch family {
+	case 2: // AF_INET
+		return "tcp"
+	case 10, 23, 30: // AF_INET6 across linux/windows/darwin
+		return "tcp6"
+	default:
+		return "tcp"
+	}
+}

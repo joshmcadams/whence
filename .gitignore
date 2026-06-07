@@ -1,0 +1,13 @@
+# Build output
+/dist/
+/ports
+/ports.exe
+/tmp/
+
+# Test / coverage
+*.out
+*.test
+
+# Editor / OS
+.DS_Store
+*.swp
