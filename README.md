@@ -84,8 +84,13 @@ ports config --init         # write a default config file
 | `enter` | detail view |
 | `/` | filter |
 | `a` | toggle all / yours |
+| `t` | cycle color theme (saved to config) |
 | `r` | refresh now |
 | `q` | quit |
+
+Themes: `indigo` (default), `teal`, `amber`, `magenta`, `green`, `mono`
+(terminal reverse-video). Cycle with `t` in the TUI — the choice is written back
+to your config — or set `theme` in the config file directly.
 
 ## Configuration
 
@@ -98,6 +103,7 @@ ignore_ports = []
 ignore_names = []
 kill_timeout_seconds = 5
 confidence_threshold = 50
+theme = "indigo"   # indigo | teal | amber | magenta | green | mono
 ```
 
 A server is shown by default when its confidence ≥ `confidence_threshold`. Use

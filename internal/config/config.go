@@ -24,6 +24,8 @@ type Config struct {
 	KillTimeoutSeconds int `toml:"kill_timeout_seconds"`
 	// ConfidenceThreshold is the minimum score to be shown without --all (Phase 2).
 	ConfidenceThreshold int `toml:"confidence_threshold"`
+	// Theme is the TUI color palette name; unknown values fall back to the default.
+	Theme string `toml:"theme"`
 }
 
 // Default returns the built-in configuration. Dev roots cover the common
@@ -48,6 +50,7 @@ func Default() Config {
 		IgnoreNames:         nil,
 		KillTimeoutSeconds:  5,
 		ConfidenceThreshold: 50,
+		Theme:               "indigo",
 	}
 }
 

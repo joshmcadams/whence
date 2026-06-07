@@ -83,6 +83,19 @@ func TestConfirmCancel(t *testing.T) {
 	}
 }
 
+func TestCycleThemeUpdatesModelAndConfig(t *testing.T) {
+	m := newLoaded() // default theme
+	start := m.theme.Name
+	// step() discards the returned cmd, so persistThemeCmd never runs — no disk write.
+	m = step(m, key("t"))
+	if m.theme.Name == start {
+		t.Fatalf("theme did not change from %q", start)
+	}
+	if m.cfg.Theme != m.theme.Name {
+		t.Errorf("cfg.Theme = %q, want %q (in sync for persistence)", m.cfg.Theme, m.theme.Name)
+	}
+}
+
 func TestFilterNarrows(t *testing.T) {
 	m := step(newLoaded(), key("/"))
 	if m.mode != modeFilter {

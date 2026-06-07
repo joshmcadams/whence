@@ -55,6 +55,7 @@ type Model struct {
 	all      bool
 	query    string
 	selected pm.Server
+	theme    Theme
 
 	status string
 	err    error
@@ -69,16 +70,29 @@ func New(cfg config.Config, all bool) Model {
 		table.WithFocused(true),
 		table.WithHeight(15),
 	)
-	st := table.DefaultStyles()
-	st.Header = st.Header.Bold(true).BorderBottom(true)
-	st.Selected = st.Selected.Bold(true).Foreground(lipgloss.Color("0")).Background(lipgloss.Color("12"))
-	t.SetStyles(st)
 
 	ti := textinput.New()
 	ti.Placeholder = "filter by name, port, or description"
 	ti.Prompt = "/"
 
-	return Model{cfg: cfg, all: all, table: t, ti: ti}
+	m := Model{cfg: cfg, all: all, table: t, ti: ti, theme: ThemeByName(cfg.Theme)}
+	m.applyTheme()
+	return m
+}
+
+// applyTheme pushes the current theme's styles onto the table.
+func (m *Model) applyTheme() {
+	m.table.SetStyles(m.theme.tableStyles())
+}
+
+// cycleTheme advances to the next palette and applies it, updating the config in
+// memory so it can be persisted.
+func (m Model) cycleTheme() Model {
+	m.theme = nextTheme(m.theme.Name)
+	m.cfg.Theme = m.theme.Name
+	m.applyTheme()
+	m.status = "theme: " + m.theme.Name
+	return m
 }
 
 // --- messages & commands ----------------------------------------------------
@@ -89,6 +103,18 @@ type loadedMsg struct {
 }
 type killedMsg struct{ res kill.Result }
 type tickMsg time.Time
+type themeSavedMsg struct {
+	name string
+	err  error
+}
+
+// persistThemeCmd saves the (theme-updated) config to disk asynchronously.
+func persistThemeCmd(cfg config.Config) tea.Cmd {
+	return func() tea.Msg {
+		_, err := config.Save(cfg)
+		return themeSavedMsg{name: cfg.Theme, err: err}
+	}
+}
 
 func loadCmd(cfg config.Config) tea.Cmd {
 	return func() tea.Msg {
@@ -144,6 +170,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = okStyle.Render("✓ killed " + describe(msg.res.Server))
 		}
 		return m, loadCmd(m.cfg) // refresh immediately
+
+	case themeSavedMsg:
+		if msg.err != nil {
+			m.status = errStyle.Render("theme: " + msg.name + " (not saved: " + msg.err.Error() + ")")
+		} else {
+			m.status = "theme: " + msg.name + " (saved)"
+		}
+		return m, nil
 
 	case tea.KeyMsg:
 		return m.handleKey(msg)
@@ -209,6 +243,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.all = !m.all
 		m.rebuild()
 		return m, nil
+	case "t":
+		m = m.cycleTheme()
+		return m, persistThemeCmd(m.cfg)
 	case "/":
 		m.mode = modeFilter
 		m.ti.Focus()
@@ -297,8 +334,8 @@ func (m Model) headerView() string {
 	if m.all {
 		scope = "all"
 	}
-	title := titleStyle.Render("ports")
-	meta := dimStyle.Render(fmt.Sprintf("  %d shown · %s", len(m.rows), scope))
+	title := m.theme.accentStyle().Render("ports")
+	meta := dimStyle.Render(fmt.Sprintf("  %d shown · %s · %s", len(m.rows), scope, m.theme.Name))
 	if m.query != "" {
 		meta += dimStyle.Render(" · /" + m.query)
 	}
@@ -309,7 +346,7 @@ func (m Model) headerView() string {
 }
 
 func (m Model) footerView() string {
-	help := dimStyle.Render("↑/↓ move · x kill · enter details · / filter · a all · r refresh · q quit")
+	help := dimStyle.Render("↑/↓ move · x kill · enter details · / filter · a all · t theme · r refresh · q quit")
 	if m.status != "" {
 		return m.status + "\n" + help
 	}
