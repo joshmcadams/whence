@@ -49,6 +49,33 @@ func TestClimb_DirectShellParentDoesNotClimb(t *testing.T) {
 	}
 }
 
+func TestPlanTree_SingleIsJustTheListener(t *testing.T) {
+	// bash(100) -> npm(200) -> node(300). --single must signal only 300.
+	tbl := table(
+		map[int]int{200: 100, 300: 200, 100: 1},
+		map[int]string{100: "bash", 200: "npm", 300: "node"},
+	)
+	if got := planTree(300, true, tbl); !reflect.DeepEqual(got, []int{300}) {
+		t.Errorf("planTree single = %v, want [300]", got)
+	}
+}
+
+func TestPlanTree_ClimbsAndIncludesSiblings(t *testing.T) {
+	// bash(100) -> make(200) -> {node(300, our listener), other(400)}.
+	// Killing 300's tree climbs to make and takes the sibling 400 too — the
+	// blast radius the confirmation must reveal.
+	tbl := table(
+		map[int]int{200: 100, 300: 200, 400: 200, 100: 1},
+		map[int]string{100: "bash", 200: "make", 300: "node", 400: "node"},
+	)
+	got := planTree(300, false, tbl)
+	sort.Ints(got)
+	want := []int{200, 300, 400}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("planTree = %v, want %v (climbs to make, includes sibling)", got, want)
+	}
+}
+
 func TestSubtree(t *testing.T) {
 	tbl := table(
 		map[int]int{200: 100, 300: 200, 400: 300, 500: 200},

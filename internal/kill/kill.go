@@ -33,6 +33,43 @@ type Result struct {
 	Err    error
 }
 
+// TreeMember is one process a native-process kill will signal.
+type TreeMember struct {
+	PID  int
+	Name string
+}
+
+// Plan describes what killing a server will do, for preview/confirmation. For a
+// native process Tree lists every process that will be signaled (the climbed
+// root first, then its descendants); for a container Docker is true and Tree is
+// nil. NoPID is set when a native server has no accessible pid.
+type Plan struct {
+	Server model.Server
+	Docker bool
+	NoPID  bool
+	Tree   []TreeMember
+}
+
+// Preview computes, without killing anything, the process tree that Server would
+// terminate. It takes a fresh snapshot, so it reflects the tree as it is right
+// now; the eventual kill re-snapshots and may differ slightly if processes have
+// since started or exited.
+func Preview(s model.Server, o Opts) Plan {
+	if s.Source == model.SourceDocker {
+		return Plan{Server: s, Docker: true}
+	}
+	if s.PID <= 0 {
+		return Plan{Server: s, NoPID: true}
+	}
+	tbl := snapshot()
+	pids := planTree(s.PID, o.Single, tbl)
+	tree := make([]TreeMember, len(pids))
+	for i, p := range pids {
+		tree[i] = TreeMember{PID: p, Name: tbl.name[p]}
+	}
+	return Plan{Server: s, Tree: tree}
+}
+
 // launchers are wrapper processes we will climb through to find the tree head.
 // Shells (bash/zsh/sh/fish/pwsh/cmd) are deliberately absent: climbing stops at
 // them so an interactive session is never killed.
@@ -68,15 +105,11 @@ func Server(s model.Server, o Opts) Result {
 func killProcess(pid int, o Opts) (string, error) {
 	tbl := snapshot()
 
-	method := "single"
-	var tree []int
+	method := "tree"
 	if o.Single {
-		tree = []int{pid}
-	} else {
-		root := climb(pid, tbl)
-		tree = subtree(root, tbl)
-		method = "tree"
+		method = "single"
 	}
+	tree := planTree(pid, o.Single, tbl)
 
 	for _, p := range tree {
 		_ = terminate(p) // best effort; some may already be gone
@@ -153,6 +186,16 @@ func snapshot() procTable {
 		}
 	}
 	return t
+}
+
+// planTree resolves the set of pids a kill will signal: just the listening pid
+// when single, otherwise the climbed tree head plus all its descendants. Shared
+// by Preview and the actual kill so the two never disagree about scope.
+func planTree(pid int, single bool, t procTable) []int {
+	if single {
+		return []int{pid}
+	}
+	return subtree(climb(pid, t), t)
 }
 
 // climb walks up through launcher wrappers to the tree head, stopping before

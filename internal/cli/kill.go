@@ -57,26 +57,23 @@ func runKill(target string, o *killOpts) error {
 	}
 	units := dedupeUnits(matches)
 
-	// Confirm unless forced.
+	timeout := o.timeout
+	if timeout <= 0 {
+		timeout = time.Duration(cfg.KillTimeoutSeconds) * time.Second
+	}
+	opts := kill.Opts{Timeout: timeout, Single: o.single}
+
+	// Confirm unless forced, previewing the full tree each kill will signal.
 	if !o.force {
-		fmt.Printf("About to kill %d server(s) matching %q:\n", len(units), target)
-		for _, s := range units {
-			fmt.Printf("  - %s\n", describe(s))
-		}
-		if !confirm("Proceed? [y/N] ") {
+		if !confirmKill(units, target, opts) {
 			fmt.Println("Aborted.")
 			return nil
 		}
 	}
 
-	timeout := o.timeout
-	if timeout <= 0 {
-		timeout = time.Duration(cfg.KillTimeoutSeconds) * time.Second
-	}
-
 	var failed int
 	for _, s := range units {
-		res := kill.Server(s, kill.Opts{Timeout: timeout, Single: o.single})
+		res := kill.Server(s, opts)
 		if res.Err != nil {
 			failed++
 			fmt.Printf("✗ %s — %v\n", describe(s), res.Err)
@@ -131,6 +128,51 @@ func dedupeUnits(servers []model.Server) []model.Server {
 		out = append(out, s)
 	}
 	return out
+}
+
+// confirmKill previews the actual process tree each kill will signal — not just
+// the listening pid — then asks for confirmation. Because a kill climbs to a
+// launcher and takes the whole subtree, one listening server can mean several
+// processes; the user sees them all before agreeing.
+func confirmKill(units []model.Server, target string, opts kill.Opts) bool {
+	plans := make([]kill.Plan, len(units))
+	totalProcs := 0
+	for i, s := range units {
+		plans[i] = kill.Preview(s, opts)
+		totalProcs += len(plans[i].Tree)
+	}
+
+	fmt.Printf("About to kill %d target(s) matching %q", len(units), target)
+	if totalProcs > 0 {
+		fmt.Printf(" — %d process(es) total", totalProcs)
+	}
+	fmt.Println(":")
+	for _, p := range plans {
+		printPlan(p)
+	}
+	return confirm("Proceed? [y/N] ")
+}
+
+func printPlan(p kill.Plan) {
+	fmt.Printf("  %s\n", describe(p.Server))
+	switch {
+	case p.Docker:
+		fmt.Println("      docker stop")
+	case p.NoPID:
+		fmt.Println("      no accessible pid (owned by another user; try elevated privileges)")
+	default:
+		for i, m := range p.Tree {
+			name := m.Name
+			if name == "" {
+				name = "?"
+			}
+			tag := ""
+			if i == 0 && len(p.Tree) > 1 {
+				tag = "  (tree root)"
+			}
+			fmt.Printf("      %d %s%s\n", m.PID, name, tag)
+		}
+	}
 }
 
 func describe(s model.Server) string {

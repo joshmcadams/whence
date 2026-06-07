@@ -81,7 +81,7 @@ type Server struct {
     Port      int
     Proto     string        // tcp / tcp6
     PID, PPID int
-    Cmdline   []string
+    Cmdline   string
     Exe       string
     Cwd       string
     StartTime time.Time
@@ -155,7 +155,9 @@ Table columns: **Port · Project · Description · Uptime · PID · marker**.
 ## 6. Package layout
 
 ```
-cmd/ports/main.go            # cobra root + subcommands
+cmd/ports/main.go            # entrypoint; calls cli.Execute()
+internal/cli/                # cobra command tree (list/kill/tui/config/doctor)
+internal/model/              # shared Server / Project types
 internal/scan/               # sockets + process enumeration
   scan.go
   cwd_linux.go               # build-tagged per OS
@@ -163,11 +165,17 @@ internal/scan/               # sockets + process enumeration
   cwd_windows.go
 internal/project/            # repo root, name, description
 internal/classify/           # "is this mine?" scoring
+internal/docker/             # compose detection path (labels → repo, k8s filtered)
+internal/inventory/          # merge native + docker; shared View filter + Sort
 internal/kill/               # tree kill + cross-platform signals
 internal/config/             # config file, dev roots, ignore lists
 internal/output/             # table / json rendering
 internal/tui/                # bubbletea model
 ```
+
+> Agent-facing docs: `AGENTS.md` (root) is the build/convention/invariant
+> cheat-sheet, included by `CLAUDE.md`; `internal/scan` and `internal/kill` carry
+> focused `AGENTS.md` notes for their per-OS and safety invariants.
 
 ---
 
