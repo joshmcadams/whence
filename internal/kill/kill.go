@@ -68,13 +68,12 @@ func Server(s model.Server, o Opts) Result {
 func killProcess(pid int, o Opts) (string, error) {
 	tbl := snapshot()
 
-	root := pid
 	method := "single"
 	var tree []int
 	if o.Single {
 		tree = []int{pid}
 	} else {
-		root = climb(pid, tbl)
+		root := climb(pid, tbl)
 		tree = subtree(root, tbl)
 		method = "tree"
 	}

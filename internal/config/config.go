@@ -95,11 +95,11 @@ func Save(cfg Config) (string, error) {
 	if err != nil {
 		return p, err
 	}
-	defer f.Close()
 	if err := toml.NewEncoder(f).Encode(cfg); err != nil {
+		_ = f.Close()
 		return p, err
 	}
-	return p, nil
+	return p, f.Close()
 }
 
 // IsUnderDevRoot reports whether dir sits under any configured dev root.

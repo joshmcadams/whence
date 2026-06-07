@@ -1,0 +1,13 @@
+version: "2"
+
+# Uses the default (standard) linter set: errcheck, govet, ineffassign,
+# staticcheck, unused. Only errcheck is tuned, to skip write errors on stdout/
+# tabwriter that are not actionable.
+linters:
+  settings:
+    errcheck:
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (*text/tabwriter.Writer).Flush
