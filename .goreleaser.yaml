@@ -48,9 +48,9 @@ changelog:
       - "^test:"
       - "^chore:"
 
-# Homebrew formula — requires a tap repo (github.com/jmcadams/homebrew-tap) and a
+# Homebrew cask — requires a tap repo (github.com/jmcadams/homebrew-tap) and a
 # HOMEBREW_TAP_GITHUB_TOKEN secret with write access to it.
-brews:
+homebrew_casks:
   - name: ports
     repository:
       owner: jmcadams
@@ -58,11 +58,13 @@ brews:
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: "https://github.com/jmcadams/ports"
     description: "Track and manage the dev servers and databases you have running on local ports"
-    license: "MIT"
-    install: |
-      bin.install "ports"
-    test: |
-      system "#{bin}/ports", "--version"
+    # Remove the macOS quarantine attribute so the binary runs without a Gatekeeper prompt.
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/ports"]
+          end
 
 # Scoop manifest — requires a bucket repo (github.com/jmcadams/scoop-bucket) and
 # a SCOOP_BUCKET_GITHUB_TOKEN secret.

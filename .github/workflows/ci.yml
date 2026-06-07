@@ -16,6 +16,10 @@ jobs:
           cache: true
       - run: go vet ./...
       - run: go test ./...
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: check
 
   cross-build:
     runs-on: ubuntu-latest

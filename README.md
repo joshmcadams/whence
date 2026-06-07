@@ -31,7 +31,7 @@ PORT  PROTO  PID     UPTIME  SRC     SERVER  DESCRIPTION
 > username/repo differ, update the module path in `go.mod`, the `-X` ldflags
 > path, and the owners in `.goreleaser.yaml` before releasing.
 
-**From source** (Go 1.24+):
+**From source** (Go 1.26+):
 
 ```sh
 go install github.com/jmcadams/ports/cmd/ports@latest
@@ -43,7 +43,7 @@ go install github.com/jmcadams/ports/cmd/ports@latest
 **Homebrew** (after a release):
 
 ```sh
-brew install jmcadams/tap/ports
+brew install --cask jmcadams/tap/ports
 ```
 
 **Scoop** (Windows):

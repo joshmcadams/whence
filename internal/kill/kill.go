@@ -36,15 +36,20 @@ type Result struct {
 // launchers are wrapper processes we will climb through to find the tree head.
 // Shells (bash/zsh/sh/fish/pwsh/cmd) are deliberately absent: climbing stops at
 // them so an interactive session is never killed.
+//
+// Bare "node" is deliberately excluded too: it would let a kill climb up into a
+// long-lived node host (e.g. an editor's extension host) and take it down. The
+// common npm/yarn/pnpm chain is still handled — we climb through those wrappers,
+// and any node helper subprocess is killed as a descendant of the subtree.
 var launchers = map[string]bool{
 	"npm": true, "npx": true, "yarn": true, "pnpm": true, "bun": true,
-	"node": true, "deno": true,
+	"deno": true,
 	"make": true, "cargo": true, "go": true, "air": true, "nodemon": true,
 	"python": true, "python3": true, "ruby": true, "bundle": true,
 	"foreman": true, "php": true, "rails": true,
 	"gradle": true, "gradlew": true, "mvn": true, "dotnet": true,
 	// Windows variants
-	"npm.cmd": true, "yarn.cmd": true, "pnpm.cmd": true, "node.exe": true,
+	"npm.cmd": true, "yarn.cmd": true, "pnpm.cmd": true,
 	"python.exe": true,
 }
 
