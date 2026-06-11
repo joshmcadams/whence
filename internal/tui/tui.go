@@ -234,7 +234,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// modeList
 	switch msg.String() {
-	case "q":
+	case "q", "esc":
 		return m, tea.Quit
 	case "r":
 		m.status = ""
@@ -346,7 +346,7 @@ func (m Model) headerView() string {
 }
 
 func (m Model) footerView() string {
-	help := dimStyle.Render("↑/↓ move · x kill · enter details · / filter · a all · t theme · r refresh · q quit")
+	help := dimStyle.Render("↑/↓ move · x kill · enter details · / filter · a all · t theme · r refresh · q/esc quit")
 	if m.status != "" {
 		return m.status + "\n" + help
 	}

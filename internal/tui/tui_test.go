@@ -96,6 +96,16 @@ func TestCycleThemeUpdatesModelAndConfig(t *testing.T) {
 	}
 }
 
+func TestQuitKeys(t *testing.T) {
+	for _, k := range []string{"q", "esc"} {
+		m := newLoaded()
+		_, cmd := m.Update(key(k))
+		if cmd == nil {
+			t.Errorf("key %q: expected quit cmd, got nil", k)
+		}
+	}
+}
+
 func TestFilterNarrows(t *testing.T) {
 	m := step(newLoaded(), key("/"))
 	if m.mode != modeFilter {
