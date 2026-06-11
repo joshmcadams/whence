@@ -1,6 +1,6 @@
 # 01 — Create the GitHub repo, add the remote, push
 
-**Status:** todo
+**Status:** done
 **Blocks:** all other backlog items (CI, releases, installs)
 **Owner:** you (requires your GitHub auth)
 

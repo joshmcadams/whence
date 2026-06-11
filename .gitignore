@@ -12,3 +12,6 @@
 # Editor / OS
 .DS_Store
 *.swp
+
+# AI tooling
+.commandcode/
