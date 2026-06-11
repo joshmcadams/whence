@@ -1,4 +1,4 @@
-module github.com/joshmcadams/ports
+module github.com/joshmcadams/whence
 
 go 1.26.1
 

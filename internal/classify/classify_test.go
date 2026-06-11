@@ -3,8 +3,8 @@ package classify
 import (
 	"testing"
 
-	"github.com/joshmcadams/ports/internal/config"
-	"github.com/joshmcadams/ports/internal/model"
+	"github.com/joshmcadams/whence/internal/config"
+	"github.com/joshmcadams/whence/internal/model"
 )
 
 func TestScoreProcess(t *testing.T) {

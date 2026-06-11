@@ -5,9 +5,9 @@ package classify
 import (
 	"strings"
 
-	"github.com/joshmcadams/ports/internal/config"
-	"github.com/joshmcadams/ports/internal/model"
-	"github.com/joshmcadams/ports/internal/project"
+	"github.com/joshmcadams/whence/internal/config"
+	"github.com/joshmcadams/whence/internal/model"
+	"github.com/joshmcadams/whence/internal/project"
 )
 
 // Score weights. A server under a dev root with a repo marker clears any sane

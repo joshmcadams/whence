@@ -11,7 +11,7 @@ import (
 	gnet "github.com/shirou/gopsutil/v4/net"
 	"github.com/shirou/gopsutil/v4/process"
 
-	"github.com/joshmcadams/ports/internal/model"
+	"github.com/joshmcadams/whence/internal/model"
 )
 
 // Processes scans all listening TCP sockets and returns one Server per

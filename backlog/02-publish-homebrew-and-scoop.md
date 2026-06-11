@@ -31,21 +31,21 @@ users can still download binaries from the releases page or `go install`.
    on those two repos (or a classic token with `repo` scope). GitHub:
    Settings → Developer settings → Personal access tokens.
 
-3. **Add the token as secrets** on the `ports` repo (the release workflow reads
+3. **Add the token as secrets** on the `whence` repo (the release workflow reads
    both names; the same token can back both):
 
    ```sh
-   gh secret set HOMEBREW_TAP_GITHUB_TOKEN --repo joshmcadams/ports
-   gh secret set SCOOP_BUCKET_GITHUB_TOKEN --repo joshmcadams/ports
+   gh secret set HOMEBREW_TAP_GITHUB_TOKEN --repo joshmcadams/whence
+   gh secret set SCOOP_BUCKET_GITHUB_TOKEN --repo joshmcadams/whence
    ```
 
 ## Verify
 
 After the first release (item 03):
-- `github.com/joshmcadams/homebrew-tap` contains `Casks/ports.rb`.
-- `github.com/joshmcadams/scoop-bucket` contains `ports.json`.
-- `brew install --cask joshmcadams/tap/ports` works on macOS.
-- `scoop bucket add joshmcadams https://github.com/joshmcadams/scoop-bucket && scoop install ports` works on Windows.
+- `github.com/joshmcadams/homebrew-tap` contains `Casks/whence.rb`.
+- `github.com/joshmcadams/scoop-bucket` contains `whence.json`.
+- `brew install --cask joshmcadams/tap/whence` works on macOS.
+- `scoop bucket add joshmcadams https://github.com/joshmcadams/scoop-bucket && scoop install whence` works on Windows.
 
 ## Notes
 

@@ -1,10 +1,10 @@
-# ports
+# whence
 
 Find the dev servers and databases **you** are running on local ports, map each
 back to the repo it was launched from, and kill them by port or by project —
 from the command line or an interactive TUI.
 
-`ports` ignores system and standard-application ports and focuses on things you
+`whence` ignores system and standard-application ports and focuses on things you
 are actively developing: servers started with `npm run dev`, `make dev`,
 `go run`, `flask run`, a `docker compose` database, and so on. For each it shows
 the **port, project name, uptime, and a description** pulled from the project's
@@ -22,7 +22,7 @@ PORT  PROTO  PID     UPTIME  SRC     SERVER  DESCRIPTION
 - **Cross-platform** — single static binary for macOS, Linux, and Windows (incl. WSL).
 - **Knows what's yours** — a confidence score from your configured dev roots, repo markers (`.git`, `package.json`, `go.mod`, …), and dev-server-looking commands.
 - **Understands Docker Compose** — attributes containers to their repo via compose labels; Kubernetes-managed containers are filtered out.
-- **Kill by port or project** — `ports kill 3000` or `ports kill myapp`. Native processes are killed as a tree (graceful `SIGTERM`, then `SIGKILL`) without touching your shell; compose services are stopped via `docker stop`.
+- **Kill by port or project** — `whence kill 3000` or `whence kill myapp`. Native processes are killed as a tree (graceful `SIGTERM`, then `SIGKILL`) without touching your shell; compose services are stopped via `docker stop`.
 - **Interactive TUI** — arrow-key navigation, `x` to kill, `enter` for details, live auto-refresh.
 
 ## Install
@@ -34,45 +34,45 @@ PORT  PROTO  PID     UPTIME  SRC     SERVER  DESCRIPTION
 **From source** (Go 1.26+):
 
 ```sh
-go install github.com/joshmcadams/ports/cmd/ports@latest
+go install github.com/joshmcadams/whence/cmd/whence@latest
 ```
 
 **Prebuilt binaries:** download from the
-[releases page](https://github.com/joshmcadams/ports/releases).
+[releases page](https://github.com/joshmcadams/whence/releases).
 
 **Homebrew** (after a release):
 
 ```sh
-brew install --cask joshmcadams/tap/ports
+brew install --cask joshmcadams/tap/whence
 ```
 
 **Scoop** (Windows):
 
 ```sh
 scoop bucket add joshmcadams https://github.com/joshmcadams/scoop-bucket
-scoop install ports
+scoop install whence
 ```
 
 ## Usage
 
 ```sh
-ports                       # list your dev servers (alias for `ports list`)
-ports list --all            # include every listening port
-ports list --json           # machine-readable output
-ports list --port 3000      # only this port
-ports list --sort uptime    # sort by port|uptime|name
-ports list --watch          # live-refresh in place (Ctrl-C to stop)
+whence                      # list your dev servers (alias for `whence list`)
+whence list --all           # include every listening port
+whence list --json          # machine-readable output
+whence list --port 3000     # only this port
+whence list --sort uptime   # sort by port|uptime|name
+whence list --watch         # live-refresh in place (Ctrl-C to stop)
 
-ports kill 3000             # kill the server on a port
-ports kill myapp            # kill every server in a project
-ports kill 3000 --force     # skip the confirmation prompt
-ports kill 3000 --single    # kill only the listening process, not its tree
+whence kill 3000            # kill the server on a port
+whence kill myapp           # kill every server in a project
+whence kill 3000 --force    # skip the confirmation prompt
+whence kill 3000 --single   # kill only the listening process, not its tree
 
-ports tui                   # interactive table
+whence tui                  # interactive table
 
-ports doctor                # platform capabilities & diagnostics
-ports config                # show effective config
-ports config --init         # write a default config file
+whence doctor               # platform capabilities & diagnostics
+whence config               # show effective config
+whence config --init        # write a default config file
 ```
 
 ### TUI keys
@@ -94,8 +94,8 @@ to your config — or set `theme` in the config file directly.
 
 ## Configuration
 
-Config lives at `~/.config/ports/config.toml` (XDG) or `%AppData%\ports\config.toml`
-on Windows. Run `ports config --init` to scaffold it.
+Config lives at `~/.config/whence/config.toml` (XDG) or `%AppData%\whence\config.toml`
+on Windows. Run `whence config --init` to scaffold it.
 
 ```toml
 dev_roots = ["/home/you/development", "/home/you/dev", "/home/you/go/src"]
@@ -124,7 +124,7 @@ A server is shown by default when its confidence ≥ `confidence_threshold`. Use
 - Without elevated privileges you only see your own processes; root-owned native
   listeners (e.g. a system Postgres) appear under `--all` without attribution.
   Run with `sudo` to attribute them, or rely on the Docker path for containers.
-- `ports` reports the machine it runs on. Inside WSL it sees the Linux side; on
+- `whence` reports the machine it runs on. Inside WSL it sees the Linux side; on
   the Windows host it sees Windows.
 - macOS requires `lsof` (preinstalled) for working-directory resolution.
 - On Windows, graceful shutdown is best-effort (`taskkill`); a tree force-kill is
@@ -134,7 +134,7 @@ A server is shown by default when its confidence ≥ `confidence_threshold`. Use
 
 ```sh
 go test ./...
-go build ./cmd/ports
+go build ./cmd/whence
 ```
 
 ## License

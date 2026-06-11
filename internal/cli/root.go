@@ -13,12 +13,12 @@ var version = "dev"
 
 func newRootCmd() *cobra.Command {
 	root := &cobra.Command{
-		Use:           "ports",
+		Use:           "whence",
 		Short:         "Track and manage the dev servers and databases you have running on local ports",
 		Version:       version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		// Running `ports` with no subcommand defaults to `ports list`.
+		// Running `whence` with no subcommand defaults to `whence list`.
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runList(cmd, args)
 		},

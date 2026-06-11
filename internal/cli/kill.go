@@ -10,9 +10,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/joshmcadams/ports/internal/config"
-	"github.com/joshmcadams/ports/internal/kill"
-	"github.com/joshmcadams/ports/internal/model"
+	"github.com/joshmcadams/whence/internal/config"
+	"github.com/joshmcadams/whence/internal/kill"
+	"github.com/joshmcadams/whence/internal/model"
 )
 
 type killOpts struct {
@@ -26,8 +26,8 @@ func newKillCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "kill <port|name>",
 		Short: "Kill the server on a port, or all servers in a project",
-		Long: "Kill by port number (e.g. `ports kill 3000`) or by project/server name\n" +
-			"(e.g. `ports kill nexxus`). Native processes are killed as a tree\n" +
+		Long: "Kill by port number (e.g. `whence kill 3000`) or by project/server name\n" +
+			"(e.g. `whence kill nexxus`). Native processes are killed as a tree\n" +
 			"(SIGTERM then SIGKILL); compose services are stopped via docker.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

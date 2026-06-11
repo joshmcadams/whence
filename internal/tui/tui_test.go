@@ -5,8 +5,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/joshmcadams/ports/internal/config"
-	pm "github.com/joshmcadams/ports/internal/model"
+	"github.com/joshmcadams/whence/internal/config"
+	pm "github.com/joshmcadams/whence/internal/model"
 )
 
 func testServers() []pm.Server {

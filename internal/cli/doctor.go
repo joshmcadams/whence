@@ -9,9 +9,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/joshmcadams/ports/internal/config"
-	"github.com/joshmcadams/ports/internal/docker"
-	"github.com/joshmcadams/ports/internal/scan"
+	"github.com/joshmcadams/whence/internal/config"
+	"github.com/joshmcadams/whence/internal/docker"
+	"github.com/joshmcadams/whence/internal/scan"
 )
 
 func newDoctorCmd() *cobra.Command {

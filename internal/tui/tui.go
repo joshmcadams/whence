@@ -13,11 +13,11 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/joshmcadams/ports/internal/config"
-	"github.com/joshmcadams/ports/internal/inventory"
-	"github.com/joshmcadams/ports/internal/kill"
-	pm "github.com/joshmcadams/ports/internal/model"
-	"github.com/joshmcadams/ports/internal/output"
+	"github.com/joshmcadams/whence/internal/config"
+	"github.com/joshmcadams/whence/internal/inventory"
+	"github.com/joshmcadams/whence/internal/kill"
+	pm "github.com/joshmcadams/whence/internal/model"
+	"github.com/joshmcadams/whence/internal/output"
 )
 
 const refreshInterval = 5 * time.Second
@@ -334,7 +334,7 @@ func (m Model) headerView() string {
 	if m.all {
 		scope = "all"
 	}
-	title := m.theme.accentStyle().Render("ports")
+	title := m.theme.accentStyle().Render("whence")
 	meta := dimStyle.Render(fmt.Sprintf("  %d shown · %s · %s", len(m.rows), scope, m.theme.Name))
 	if m.query != "" {
 		meta += dimStyle.Render(" · /" + m.query)
@@ -362,7 +362,7 @@ func (m Model) detailView() string {
 		return detailLabel.Render(label) + val
 	}
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("ports — detail") + "\n\n")
+	b.WriteString(titleStyle.Render("whence — detail") + "\n\n")
 	b.WriteString(row("Port", fmt.Sprintf("%d/%s", s.Port, s.Proto)) + "\n")
 	b.WriteString(row("Server", s.DisplayName()) + "\n")
 	b.WriteString(row("Source", output.SrcLabel(s.Source)) + "\n")

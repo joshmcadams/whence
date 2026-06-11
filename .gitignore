@@ -1,8 +1,8 @@
 # Build output
 /dist/
 /bin/
-/ports
-/ports.exe
+/whence
+/whence.exe
 /tmp/
 
 # Test / coverage

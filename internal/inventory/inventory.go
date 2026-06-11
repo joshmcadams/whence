@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/joshmcadams/ports/internal/classify"
-	"github.com/joshmcadams/ports/internal/config"
-	"github.com/joshmcadams/ports/internal/docker"
-	"github.com/joshmcadams/ports/internal/model"
-	"github.com/joshmcadams/ports/internal/scan"
+	"github.com/joshmcadams/whence/internal/classify"
+	"github.com/joshmcadams/whence/internal/config"
+	"github.com/joshmcadams/whence/internal/docker"
+	"github.com/joshmcadams/whence/internal/model"
+	"github.com/joshmcadams/whence/internal/scan"
 )
 
 // Collect builds the full inventory: native process servers (scored) merged

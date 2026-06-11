@@ -7,10 +7,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/joshmcadams/ports/internal/config"
-	"github.com/joshmcadams/ports/internal/inventory"
-	"github.com/joshmcadams/ports/internal/model"
-	"github.com/joshmcadams/ports/internal/output"
+	"github.com/joshmcadams/whence/internal/config"
+	"github.com/joshmcadams/whence/internal/inventory"
+	"github.com/joshmcadams/whence/internal/model"
+	"github.com/joshmcadams/whence/internal/output"
 )
 
 type listOpts struct {
@@ -42,7 +42,7 @@ func newListCmd() *cobra.Command {
 	return cmd
 }
 
-// runList is the default action when `ports` is run with no subcommand.
+// runList is the default action when `whence` is run with no subcommand.
 func runList(cmd *cobra.Command, _ []string) error {
 	return runListWith(&listOpts{sortBy: "port"})
 }
@@ -86,7 +86,7 @@ func watchList(cfg config.Config, o *listOpts) error {
 			return err
 		}
 		fmt.Print("\033[H\033[2J") // home + clear screen
-		fmt.Printf("ports — %s (every %s, Ctrl-C to stop)\n\n",
+		fmt.Printf("whence — %s (every %s, Ctrl-C to stop)\n\n",
 			time.Now().Format("15:04:05"), o.interval)
 		output.Table(os.Stdout, servers)
 		time.Sleep(o.interval)

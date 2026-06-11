@@ -37,7 +37,7 @@ signal. `Single` does not apply to them.
 
 A kill climbs to a launcher and takes the whole subtree, so one listening server
 can mean several processes — and a shared launcher (`make dev` / one `npm` script
-starting multiple services) means `ports kill <port>` stops the siblings too.
+starting multiple services) means `whence kill <port>` stops the siblings too.
 
 So that the confirmation can't lie about the blast radius, the scope is computed
 in exactly one place — `planTree(pid, single, tbl)` — which both `killProcess`

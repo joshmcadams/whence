@@ -1,10 +1,10 @@
-BINARY  := ports
-PKG     := ./cmd/ports
+BINARY  := whence
+PKG     := ./cmd/whence
 BIN_DIR := bin
 
 # Version is injected into the binary (same path GoReleaser uses).
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-LDFLAGS := -s -w -X github.com/joshmcadams/ports/internal/cli.version=$(VERSION)
+LDFLAGS := -s -w -X github.com/joshmcadams/whence/internal/cli.version=$(VERSION)
 
 # Args passed to `make run`, e.g. `make run ARGS="list --all"`.
 ARGS ?=
@@ -12,7 +12,7 @@ ARGS ?=
 .DEFAULT_GOAL := build
 
 .PHONY: build
-build: ## Compile the binary to bin/ports
+build: ## Compile the binary to bin/whence
 	go build -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/$(BINARY) $(PKG)
 
 .PHONY: run

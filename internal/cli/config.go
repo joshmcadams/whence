@@ -7,7 +7,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/spf13/cobra"
 
-	"github.com/joshmcadams/ports/internal/config"
+	"github.com/joshmcadams/whence/internal/config"
 )
 
 func newConfigCmd() *cobra.Command {
@@ -35,7 +35,7 @@ func newConfigCmd() *cobra.Command {
 			}
 			fmt.Println("# path:", config.Path())
 			if _, err := os.Stat(config.Path()); err != nil {
-				fmt.Println("# (file not present — showing built-in defaults; run `ports config --init` to write it)")
+				fmt.Println("# (file not present — showing built-in defaults; run `whence config --init` to write it)")
 			}
 			return toml.NewEncoder(os.Stdout).Encode(cfg)
 		},

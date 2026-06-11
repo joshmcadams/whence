@@ -19,34 +19,34 @@ are exactly the things a Linux-only run cannot validate.
 
 ## Steps (run on each OS)
 
-1. Build/install: `go install github.com/joshmcadams/ports/cmd/ports@latest`
+1. Build/install: `go install github.com/joshmcadams/whence/cmd/whence@latest`
    (or grab the release binary once item 03 is done).
 2. Start a known dev server from a repo, e.g. `npm run dev` or
    `python3 -m http.server 8099` from inside a git repo under your dev root.
 3. Run:
    ```sh
-   ports doctor          # check capabilities/dependencies
-   ports list            # the server should appear, attributed to its repo
-   ports list --json     # confirm the "cwd" field is populated
+   whence doctor          # check capabilities/dependencies
+   whence list            # the server should appear, attributed to its repo
+   whence list --json     # confirm the "cwd" field is populated
    ```
-4. Test a kill on a disposable server: `ports kill 8099`.
+4. Test a kill on a disposable server: `whence kill 8099`.
 
 ## What to check specifically
 
 ### macOS
-- `ports doctor` shows `lsof` found. If missing, cwd resolution and possibly the
+- `whence doctor` shows `lsof` found. If missing, cwd resolution and possibly the
   whole scan degrade — confirm behavior and update `doctor` messaging if needed.
-- `ports list` shows non-empty `DIRECTORY`/`cwd` and correct project attribution.
+- `whence list` shows non-empty `DIRECTORY`/`cwd` and correct project attribution.
 - Confirm whether socket enumeration needs `sudo` for your own processes (it
   shouldn't, but verify).
 
 ### Windows (native, not WSL)
-- `ports list` resolves `cwd` for your own dev servers (the PEB read can fail
+- `whence list` resolves `cwd` for your own dev servers (the PEB read can fail
   across the 32/64-bit boundary or without rights — note what happens).
-- `ports kill` uses `taskkill`; graceful shutdown is best-effort. Verify the
+- `whence kill` uses `taskkill`; graceful shutdown is best-effort. Verify the
   port is actually freed (force path works) and that your shell isn't affected.
 - Sanity-check that WSL servers do **not** appear here (separate netns) — and
-  that running `ports` *inside* WSL shows the Linux side. This is expected.
+  that running `whence` *inside* WSL shows the Linux side. This is expected.
 
 ## Acceptance
 

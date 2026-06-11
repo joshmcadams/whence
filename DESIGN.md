@@ -1,4 +1,4 @@
-# `ports` — dev server / port tracker
+# `whence` — dev server / port tracker
 
 A cross-platform CLI + TUI that finds the dev servers and databases **you** are
 running, maps each listening port back to the repo it was launched from, and
@@ -70,7 +70,7 @@ The tool reports **the machine it runs on**. Inside WSL it sees the Linux netns;
 
 ### Privileges
 
-Your own dev servers (same user) need no elevation. Reading another user's process cwd needs root on some OSes; `ports doctor` reports what's available and warns when a row is incomplete due to permissions.
+Your own dev servers (same user) need no elevation. Reading another user's process cwd needs root on some OSes; `whence doctor` reports what's available and warns when a row is incomplete due to permissions.
 
 ---
 
@@ -104,24 +104,24 @@ type Project struct {
 ## 3. CLI surface
 
 ```
-ports [list]              # table of your dev servers
+whence [list]             # table of your dev servers
   --all                   #   include system/standard ports too
   --json                  #   machine-readable
   --port <n>              #   filter to one port
   --watch                 #   refresh in place
   --sort port|uptime|name
 
-ports kill <port|name>    # kill by port (3000) or project (nexxus)
+whence kill <port|name>   # kill by port (3000) or project (nexxus)
   --force                 #   skip confirmation
   --timeout 5s            #   grace period before SIGKILL
   --single                #   kill only the listening PID, not the tree
 
-ports tui                 # interactive table
-ports doctor              # report per-OS capabilities, privileges, missing deps (lsof)
-ports config              # show / edit config path
+whence tui                # interactive table
+whence doctor             # report per-OS capabilities, privileges, missing deps (lsof)
+whence config             # show / edit config path
 ```
 
-Config at `~/.config/ports/config.toml` (XDG; `%AppData%\ports` on Windows):
+Config at `~/.config/whence/config.toml` (XDG; `%AppData%\whence` on Windows):
 dev roots (default candidates `~/Development`, `~/dev`, `~/Projects`, `~/src`, `~/code`, `~/go/src`), ignore lists (ports / process names), kill timeout, confidence threshold.
 
 ---
@@ -155,7 +155,7 @@ Table columns: **Port · Project · Description · Uptime · PID · marker**.
 ## 6. Package layout
 
 ```
-cmd/ports/main.go            # entrypoint; calls cli.Execute()
+cmd/whence/main.go            # entrypoint; calls cli.Execute()
 internal/cli/                # cobra command tree (list/kill/tui/config/doctor)
 internal/model/              # shared Server / Project types
 internal/scan/               # sockets + process enumeration
@@ -182,9 +182,9 @@ internal/tui/                # bubbletea model
 ## 7. Execution plan (phased)
 
 - **Phase 0 — scaffold.** Go module, cobra skeleton, config loader, `Server`/`Project` types.
-- **Phase 1 — discovery (the risk, done first).** Listening sockets + process info; **cwd resolution on all three OSes**; `ports list --all` showing raw rows; `ports doctor`.
-- **Phase 2 — classification.** Repo-root walk, confidence scoring, project name + description extraction; **Docker/compose detection path** (labels → repo, k8s filtered out) merged + deduped with native results; filtered `ports list` and `--json`.
-- **Phase 3 — kill.** Tree kill, graceful→force, per-OS signals; **`docker stop` backend for compose services**; `ports kill <port>` and `ports kill <name>` with confirmation.
+- **Phase 1 — discovery (the risk, done first).** Listening sockets + process info; **cwd resolution on all three OSes**; `whence list --all` showing raw rows; `whence doctor`.
+- **Phase 2 — classification.** Repo-root walk, confidence scoring, project name + description extraction; **Docker/compose detection path** (labels → repo, k8s filtered out) merged + deduped with native results; filtered `whence list` and `--json`.
+- **Phase 3 — kill.** Tree kill, graceful→force, per-OS signals; **`docker stop` backend for compose services**; `whence kill <port>` and `whence kill <name>` with confirmation.
 - **Phase 4 — TUI.** Bubble Tea table, keybindings, confirm modal, auto-refresh, detail view.
 - **Phase 5 — polish & distribution.** `--watch`, config UX, GoReleaser (darwin amd64/arm64, linux amd64/arm64, windows amd64), Homebrew tap + Scoop + `go install`, README, GitHub Actions CI.
 
@@ -192,7 +192,7 @@ internal/tui/                # bubbletea model
 
 ## 8. Open risks
 
-- macOS cwd depends on `lsof` (or optional cgo) — `ports doctor` flags if missing.
+- macOS cwd depends on `lsof` (or optional cgo) — `whence doctor` flags if missing.
 - Windows graceful shutdown is weaker than POSIX (tree-force only).
 - Attribution must read the **tree**, not the leaf PID, or `npm`-wrapped servers get mislabeled.
 - Same-user only without elevation: root-owned listeners (e.g. a native Postgres on `:5432`) show no PID to an unprivileged scan and appear under `--all` only, unattributed. `doctor` and the row flag this.

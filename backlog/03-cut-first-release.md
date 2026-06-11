@@ -10,7 +10,7 @@
 builds binaries for macOS/Linux/Windows × amd64/arm64, creates archives +
 checksums, publishes a GitHub Release, and (if item 02 is done) updates the tap
 and bucket. The binary version comes from the tag via ldflags
-(`ports --version`).
+(`whence --version`).
 
 ## Steps
 
@@ -19,7 +19,7 @@ and bucket. The binary version comes from the tag via ldflags
 2. (Optional) Dry-run a snapshot build locally to see artifacts without tagging:
 
    ```sh
-   cd ~/development/personal/ports
+   cd ~/development/personal/whence
    go run github.com/goreleaser/goreleaser/v2@latest release --snapshot --clean
    ls dist/
    ```
@@ -27,7 +27,7 @@ and bucket. The binary version comes from the tag via ldflags
 3. Tag and push:
 
    ```sh
-   git tag -a v0.1.0 -m "ports v0.1.0"
+   git tag -a v0.1.0 -m "whence v0.1.0"
    git push origin v0.1.0
    ```
 
@@ -37,7 +37,7 @@ and bucket. The binary version comes from the tag via ldflags
 
 - A GitHub Release `v0.1.0` exists with archives for all 6 os/arch combos plus
   `checksums.txt`.
-- A downloaded binary reports the right version: `ports --version` → `ports version 0.1.0`.
+- A downloaded binary reports the right version: `whence --version` → `whence version 0.1.0`.
 - If item 02 is done: the tap and bucket received their files.
 
 ## Notes

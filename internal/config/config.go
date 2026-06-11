@@ -58,14 +58,14 @@ func Default() Config {
 func Path() string {
 	if runtime.GOOS == "windows" {
 		if base := os.Getenv("AppData"); base != "" {
-			return filepath.Join(base, "ports", "config.toml")
+			return filepath.Join(base, "whence", "config.toml")
 		}
 	}
 	if base := os.Getenv("XDG_CONFIG_HOME"); base != "" {
-		return filepath.Join(base, "ports", "config.toml")
+		return filepath.Join(base, "whence", "config.toml")
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", "ports", "config.toml")
+	return filepath.Join(home, ".config", "whence", "config.toml")
 }
 
 // Load reads the config file, falling back to defaults for any missing fields.

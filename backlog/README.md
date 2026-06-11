@@ -1,13 +1,13 @@
 # Backlog
 
-Remaining work to get `ports` published and verified. These are the things that
+Remaining work to get `whence` published and verified. These are the things that
 must be done **outside this dev machine** (GitHub setup, releasing, and testing
 on other operating systems).
 
 The code is feature-complete (Phases 0–5), all tests pass, and it cross-compiles
 for macOS/Linux/Windows. The GitHub user has been set to **`joshmcadams`**
 throughout (module path, GoReleaser owners, README); the assumed repo name is
-**`ports`** — adjust if you use a different name.
+**`whence`** — adjust if you use a different name.
 
 | # | Item | Blocks | Effort |
 |---|------|--------|--------|

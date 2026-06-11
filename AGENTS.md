@@ -1,4 +1,4 @@
-# AGENTS.md — working in `ports`
+# AGENTS.md — working in `whence`
 
 Guidance for AI agents (and humans who like terse docs) working in this repo.
 For the product-level "what and why," read `README.md`; for the original
@@ -7,7 +7,7 @@ invariant cheat-sheet.
 
 ## What this is
 
-`ports` is a cross-platform Go CLI + TUI that finds the dev servers and
+`whence` is a cross-platform Go CLI + TUI that finds the dev servers and
 databases the current user is running on local ports, maps each listening port
 back to the repo it was launched from, and kills them by port or by project.
 Single static binary per OS/arch. No daemon, no persistence — every command is
@@ -16,7 +16,7 @@ an on-demand snapshot.
 ## Commands
 
 ```sh
-make build        # -> bin/ports (injects version via -ldflags)
+make build        # -> bin/whence (injects version via -ldflags)
 make test         # go test ./...
 make lint         # gofmt -l + go vet (+ golangci-lint if installed)
 make fmt          # gofmt -w .
@@ -53,8 +53,8 @@ extend `inventory`.
 
 | Package | Responsibility |
 |---------|----------------|
-| `cmd/ports` | `main`; just calls `cli.Execute()`. |
-| `internal/cli` | cobra command tree (`list`, `kill`, `tui`, `config`, `doctor`) + the default `ports` = `list`. |
+| `cmd/whence` | `main`; just calls `cli.Execute()`. |
+| `internal/cli` | cobra command tree (`list`, `kill`, `tui`, `config`, `doctor`) + the default `whence` = `list`. |
 | `internal/model` | shared `Server` / `Project` types and their display helpers. The dependency sink — it imports nothing internal. |
 | `internal/config` | load/save TOML config, dev-root matching (`IsUnderDevRoot`), XDG/`%AppData%` path resolution. |
 | `internal/scan` | enumerate listening TCP sockets + owning process; **per-OS cwd resolution** (build-tagged). See `internal/scan/AGENTS.md`. |
@@ -77,7 +77,7 @@ nothing below `inventory` should import `cli`, `tui`, or `inventory`.
   `Server.Notes`. Only a failure to enumerate sockets at all aborts a scan. Keep
   this resilience — don't turn a per-process error into a hard return.
 - **Docker is best-effort.** `inventory.Collect` deliberately ignores the error
-  from `docker.Servers()`; a missing/broken Docker must never break `ports list`.
+  from `docker.Servers()`; a missing/broken Docker must never break `whence list`.
 - **Cross-platform code is build-tagged, one file per OS** (`cwd_linux.go`,
   `cwd_darwin.go`, `cwd_windows.go`, `signal_unix.go`, `signal_windows.go`). Add
   platform behavior by adding/editing these, never with `runtime.GOOS`
@@ -87,7 +87,7 @@ nothing below `inventory` should import `cli`, `tui`, or `inventory`.
   TUI tests pump `Update()`; kill tests exercise `climb`/`subtree` on synthetic
   process tables. New behavior in `kill`, `classify`, `project`, `docker`,
   `inventory`, or `tui` should come with a test in the same style.
-- Module path is `github.com/joshmcadams/ports`. If the GitHub owner changes,
+- Module path is `github.com/joshmcadams/whence`. If the GitHub owner changes,
   update `go.mod`, the `-X ...cli.version` ldflags path (Makefile +
   `.goreleaser.yaml`), and the goreleaser tap/bucket owners together.
 
