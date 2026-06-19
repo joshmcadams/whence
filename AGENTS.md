@@ -56,6 +56,7 @@ extend `inventory`.
 | `cmd/whence` | `main`; just calls `cli.Execute()`. |
 | `internal/cli` | cobra command tree (`list`, `kill`, `tui`, `config`, `doctor`) + the default `whence` = `list`. |
 | `internal/model` | shared `Server` / `Project` types and their display helpers. The dependency sink — it imports nothing internal. |
+| `internal/execx` | run external commands with a hard timeout. A leaf util (imports nothing internal); **every shell-out goes through it**, never `os/exec` directly. |
 | `internal/config` | load/save TOML config, dev-root matching (`IsUnderDevRoot`), XDG/`%AppData%` path resolution. |
 | `internal/scan` | enumerate listening TCP sockets + owning process; **per-OS cwd resolution** (build-tagged). See `internal/scan/AGENTS.md`. |
 | `internal/project` | walk cwd → repo root; extract name + description from manifests / README. |
@@ -78,6 +79,12 @@ nothing below `inventory` should import `cli`, `tui`, or `inventory`.
   this resilience — don't turn a per-process error into a hard return.
 - **Docker is best-effort.** `inventory.Collect` deliberately ignores the error
   from `docker.Servers()`; a missing/broken Docker must never break `whence list`.
+- **External commands run with a timeout.** Every shell-out (`docker`, `lsof`,
+  `taskkill`) goes through `internal/execx`, never `os/exec` directly, so a
+  wedged dependency times out instead of hanging `whence`. A real non-zero exit
+  passes through unchanged; only a deadline becomes a `timed out` error. The one
+  allowed direct `os/exec` use is `exec.LookPath` for availability checks (no
+  child process is spawned).
 - **Cross-platform code is build-tagged, one file per OS** (`cwd_linux.go`,
   `cwd_darwin.go`, `cwd_windows.go`, `signal_unix.go`, `signal_windows.go`). Add
   platform behavior by adding/editing these, never with `runtime.GOOS`

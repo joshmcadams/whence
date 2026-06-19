@@ -4,9 +4,15 @@ package scan
 
 import (
 	"fmt"
-	"os/exec"
 	"strings"
+	"time"
+
+	"github.com/joshmcadams/whence/internal/execx"
 )
+
+// lsofTimeout bounds a single lsof call so one stuck process can't stall the
+// whole scan; on timeout the caller records it as a per-row note.
+const lsofTimeout = 2 * time.Second
 
 // processCwd resolves a process's working directory on macOS, where gopsutil
 // does not implement Cwd(). We parse `lsof` field output:
@@ -18,7 +24,7 @@ import (
 // A cgo proc_pidinfo(PROC_PIDVNODEPATHINFO) implementation can replace this
 // later to drop the dependency.
 func processCwd(pid int32) (string, error) {
-	out, err := exec.Command("lsof", "-a", "-p", fmt.Sprint(pid), "-d", "cwd", "-Fn").Output()
+	out, err := execx.Output(lsofTimeout, "lsof", "-a", "-p", fmt.Sprint(pid), "-d", "cwd", "-Fn")
 	if err != nil {
 		return "", fmt.Errorf("lsof: %w", err)
 	}

@@ -10,12 +10,12 @@ package kill
 import (
 	"errors"
 	"fmt"
-	"os/exec"
 	"strconv"
 	"time"
 
 	"github.com/shirou/gopsutil/v4/process"
 
+	"github.com/joshmcadams/whence/internal/execx"
 	"github.com/joshmcadams/whence/internal/model"
 )
 
@@ -152,8 +152,10 @@ func dockerStop(s model.Server, o Opts) Result {
 	if secs <= 0 {
 		secs = 5
 	}
-	cmd := exec.Command("docker", "stop", "-t", strconv.Itoa(secs), s.Name)
-	if out, err := cmd.CombinedOutput(); err != nil {
+	// `docker stop` waits up to `secs` for a graceful stop; bound the CLI call
+	// itself beyond that so a wedged daemon can't hang the kill forever.
+	timeout := time.Duration(secs)*time.Second + 10*time.Second
+	if out, err := execx.CombinedOutput(timeout, "docker", "stop", "-t", strconv.Itoa(secs), s.Name); err != nil {
 		return Result{Server: s, Method: "docker stop", Err: fmt.Errorf("%v: %s", err, out)}
 	}
 	return Result{Server: s, Killed: true, Method: "docker stop"}

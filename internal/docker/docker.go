@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/joshmcadams/whence/internal/execx"
 	"github.com/joshmcadams/whence/internal/model"
 	"github.com/joshmcadams/whence/internal/project"
 )
@@ -18,6 +19,11 @@ const (
 	confCompose   = 80 // compose service attributed to a repo working_dir
 	confContainer = 40 // standalone container, no repo attribution
 )
+
+// dockerTimeout bounds each docker CLI call. Docker is best-effort, so a wedged
+// daemon must time out rather than hang `whence list`; 5s tolerates a slow but
+// healthy daemon (e.g. the first query after boot) without dropping results.
+const dockerTimeout = 5 * time.Second
 
 // Available reports whether the docker CLI is usable on this machine.
 func Available() bool {
@@ -157,7 +163,7 @@ func hostPorts(c inspect) []portMap {
 }
 
 func runningIDs() ([]string, error) {
-	out, err := exec.Command("docker", "ps", "-q", "--no-trunc").Output()
+	out, err := execx.Output(dockerTimeout, "docker", "ps", "-q", "--no-trunc")
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +172,7 @@ func runningIDs() ([]string, error) {
 
 func inspectAll(ids []string) ([]inspect, error) {
 	args := append([]string{"inspect"}, ids...)
-	out, err := exec.Command("docker", args...).Output()
+	out, err := execx.Output(dockerTimeout, "docker", args...)
 	if err != nil {
 		return nil, err
 	}

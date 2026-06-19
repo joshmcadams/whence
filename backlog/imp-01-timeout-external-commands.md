@@ -1,9 +1,17 @@
 # imp-01 — Time-bound every external command
 
-**Status:** todo
+**Status:** done (branch `improvements`)
 **Priority:** high — robustness; affects the default command for everyone
 **Category:** robustness / correctness
 **Effort:** ~45 min
+
+> **Implemented.** Added `internal/execx` (timeout chokepoint: `Output`,
+> `CombinedOutput`, `Run`) and routed all five shell-outs through it — docker
+> `ps`/`inspect` (5s), `docker stop` (grace + 10s), macOS `lsof` (2s), Windows
+> `taskkill` (10s). `exec.LookPath` in `docker.Available` is left direct (no
+> child spawned). A non-zero exit passes through unchanged; only a deadline
+> becomes a `timed out` error. Convention recorded in `AGENTS.md`; unit-tested
+> in `execx_test.go` (real sleep/timeout, no mocks).
 
 ## Problem
 
