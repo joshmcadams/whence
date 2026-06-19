@@ -27,8 +27,10 @@ func newKillCmd() *cobra.Command {
 		Use:   "kill <port|name>",
 		Short: "Kill the server on a port, or all servers in a project",
 		Long: "Kill by port number (e.g. `whence kill 3000`) or by project/server name\n" +
-			"(e.g. `whence kill nexxus`). Native processes are killed as a tree\n" +
-			"(SIGTERM then SIGKILL); compose services are stopped via docker.",
+			"(e.g. `whence kill nexxus`). A name prefers an exact (case-insensitive)\n" +
+			"match and only falls back to substring when there is none. Native\n" +
+			"processes are killed as a tree (SIGTERM then SIGKILL); compose services\n" +
+			"are stopped via docker.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runKill(args[0], o)
@@ -51,7 +53,7 @@ func runKill(target string, o *killOpts) error {
 		return err
 	}
 
-	matches := matchTargets(servers, target)
+	matches, fuzzy := matchTargets(servers, target)
 	if len(matches) == 0 {
 		return fmt.Errorf("no server found matching %q", target)
 	}
@@ -65,7 +67,7 @@ func runKill(target string, o *killOpts) error {
 
 	// Confirm unless forced, previewing the full tree each kill will signal.
 	if !o.force {
-		if !confirmKill(units, target, opts) {
+		if !confirmKill(units, target, fuzzy, opts) {
 			fmt.Println("Aborted.")
 			return nil
 		}
@@ -88,21 +90,42 @@ func runKill(target string, o *killOpts) error {
 }
 
 // matchTargets selects servers by port (if target is a positive integer) or by
-// case-insensitive name (project name, display name, or container/process name).
-func matchTargets(servers []model.Server, target string) []model.Server {
+// name. Name matching prefers exact (case-insensitive) matches on the project,
+// display, or process/container name; only when there are none does it fall back
+// to substring, returning fuzzy=true so the confirmation can flag the looser
+// match. Exact-first keeps `kill api` from also taking `api-gateway` down.
+func matchTargets(servers []model.Server, target string) (matches []model.Server, fuzzy bool) {
 	if port, err := strconv.Atoi(target); err == nil && port > 0 {
-		return filter(servers, func(s model.Server) bool { return s.Port == port })
+		return filter(servers, func(s model.Server) bool { return s.Port == port }), false
 	}
 	want := strings.ToLower(target)
-	return filter(servers, func(s model.Server) bool {
-		if strings.Contains(strings.ToLower(s.DisplayName()), want) {
+	if exact := filter(servers, func(s model.Server) bool { return nameMatches(s, want, true) }); len(exact) > 0 {
+		return exact, false
+	}
+	return filter(servers, func(s model.Server) bool { return nameMatches(s, want, false) }), true
+}
+
+// nameMatches reports whether any of a server's names equals (exact) or contains
+// (substring) want; comparison is case-insensitive.
+func nameMatches(s model.Server, want string, exact bool) bool {
+	names := []string{s.DisplayName(), s.Name}
+	if s.Project != nil {
+		names = append(names, s.Project.Name)
+	}
+	for _, n := range names {
+		n = strings.ToLower(n)
+		if n == "" {
+			continue
+		}
+		if exact {
+			if n == want {
+				return true
+			}
+		} else if strings.Contains(n, want) {
 			return true
 		}
-		if strings.Contains(strings.ToLower(s.Name), want) {
-			return true
-		}
-		return s.Project != nil && strings.Contains(strings.ToLower(s.Project.Name), want)
-	})
+	}
+	return false
 }
 
 // dedupeUnits collapses servers that map to the same kill action: native
@@ -134,7 +157,7 @@ func dedupeUnits(servers []model.Server) []model.Server {
 // the listening pid — then asks for confirmation. Because a kill climbs to a
 // launcher and takes the whole subtree, one listening server can mean several
 // processes; the user sees them all before agreeing.
-func confirmKill(units []model.Server, target string, opts kill.Opts) bool {
+func confirmKill(units []model.Server, target string, fuzzy bool, opts kill.Opts) bool {
 	plans := make([]kill.Plan, len(units))
 	totalProcs := 0
 	for i, s := range units {
@@ -142,7 +165,11 @@ func confirmKill(units []model.Server, target string, opts kill.Opts) bool {
 		totalProcs += len(plans[i].Tree)
 	}
 
-	fmt.Printf("About to kill %d target(s) matching %q", len(units), target)
+	if fuzzy {
+		fmt.Printf("No exact match for %q; %d server(s) contain it", target, len(units))
+	} else {
+		fmt.Printf("About to kill %d target(s) matching %q", len(units), target)
+	}
 	if totalProcs > 0 {
 		fmt.Printf(" — %d process(es) total", totalProcs)
 	}

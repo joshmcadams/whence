@@ -36,7 +36,7 @@ approach.
 | [imp-01](imp-01-timeout-external-commands.md) ✅ | Time-bound every external command (a hung Docker daemon hangs the default command) | robustness | done |
 | [imp-02](imp-02-tui-kill-blast-radius.md) ✅ | Show the full kill process tree in the **TUI** confirmation (the CLI already does) | safety | done |
 | [imp-03](imp-03-implement-ignore-lists.md) ✅ | Implement (or remove) `ignore_ports` / `ignore_names` — documented but dead config | correctness | done |
-| [imp-04](imp-04-kill-by-name-exact-match.md) | Make `kill <name>` prefer exact matches over substring | safety | ~30 min |
+| [imp-04](imp-04-kill-by-name-exact-match.md) ✅ | Make `kill <name>` prefer exact matches over substring | safety | done |
 | [imp-05](imp-05-test-untested-core-packages.md) | Test the 0%-coverage core packages (`config.IsUnderDevRoot`, `output`, `model`, `scan`) | testing | ~2 hr |
 | [imp-06](imp-06-hidden-server-messaging.md) | Tell the user when servers are hidden instead of "nothing found" | UX | ~30 min |
 | [imp-07](imp-07-surface-network-exposure.md) | Surface bind address / network exposure (the data is already collected) | UX | ~45 min |

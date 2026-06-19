@@ -16,23 +16,57 @@ func sample() []model.Server {
 }
 
 func TestMatchTargets_ByPort(t *testing.T) {
-	got := matchTargets(sample(), "5433")
+	got, fuzzy := matchTargets(sample(), "5433")
 	if len(got) != 1 || got[0].Port != 5433 {
 		t.Fatalf("got %d matches, want 1 on :5433", len(got))
+	}
+	if fuzzy {
+		t.Error("a port match should never be fuzzy")
 	}
 }
 
 func TestMatchTargets_ByName(t *testing.T) {
-	got := matchTargets(sample(), "JFDID") // case-insensitive
+	got, fuzzy := matchTargets(sample(), "JFDID") // case-insensitive, exact on project name
 	if len(got) != 3 {
 		t.Fatalf("got %d matches for jfdid, want 3", len(got))
+	}
+	if fuzzy {
+		t.Error("exact project-name match should not be flagged fuzzy")
 	}
 }
 
 func TestMatchTargets_NumericIsAlwaysPort(t *testing.T) {
 	// "100" is a pid in the data but must be treated as a port, matching nothing.
-	if got := matchTargets(sample(), "100"); len(got) != 0 {
+	if got, _ := matchTargets(sample(), "100"); len(got) != 0 {
 		t.Errorf("got %d matches, want 0 (100 is a port, none listen there)", len(got))
+	}
+}
+
+func TestMatchTargets_ExactPreferredOverSubstring(t *testing.T) {
+	servers := []model.Server{
+		{Port: 3000, PID: 1, Source: model.SourceProcess, Project: &model.Project{Name: "api"}},
+		{Port: 3001, PID: 2, Source: model.SourceProcess, Project: &model.Project{Name: "api-gateway"}},
+	}
+	got, fuzzy := matchTargets(servers, "api")
+	if len(got) != 1 || got[0].Port != 3000 {
+		t.Fatalf("kill api should hit only the exact 'api', got %d match(es)", len(got))
+	}
+	if fuzzy {
+		t.Error("an exact match must not be flagged fuzzy")
+	}
+}
+
+func TestMatchTargets_SubstringFallbackIsFuzzy(t *testing.T) {
+	servers := []model.Server{
+		{Port: 3000, PID: 1, Source: model.SourceProcess, Project: &model.Project{Name: "api"}},
+		{Port: 3001, PID: 2, Source: model.SourceProcess, Project: &model.Project{Name: "api-gateway"}},
+	}
+	got, fuzzy := matchTargets(servers, "gate") // no exact match anywhere
+	if len(got) != 1 || got[0].Port != 3001 {
+		t.Fatalf("kill gate should fall back to substring 'api-gateway', got %d match(es)", len(got))
+	}
+	if !fuzzy {
+		t.Error("a substring fallback must be flagged fuzzy so the confirmation can say so")
 	}
 }
 

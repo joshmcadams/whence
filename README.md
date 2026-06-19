@@ -65,7 +65,7 @@ whence list --watch         # live-refresh in place (Ctrl-C to stop)
 whence list --no-ignore     # bypass ignore_ports / ignore_names
 
 whence kill 3000            # kill the server on a port
-whence kill myapp           # kill every server in a project
+whence kill myapp           # kill every server in a project (exact name preferred)
 whence kill 3000 --force    # skip the confirmation prompt
 whence kill 3000 --single   # kill only the listening process, not its tree
 

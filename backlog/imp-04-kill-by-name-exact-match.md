@@ -1,9 +1,21 @@
 # imp-04 — Make `kill <name>` prefer exact matches
 
-**Status:** todo
+**Status:** done (branch `improvements`)
 **Priority:** medium-high — destructive over-match
 **Category:** safety / UX
 **Effort:** ~30 min
+
+> **Implemented.** `matchTargets` now tiers name matching: an exact
+> (case-insensitive) match on the project / display / process name wins
+> outright, and only when there are none does it fall back to substring —
+> returning `fuzzy=true`. `runKill` threads that to `confirmKill`, which flags
+> the looser match in its header (`No exact match for "app"; 3 server(s)
+> contain it:`) so the user understands why several things are about to die.
+> Numeric targets stay port-only. The TUI `/` filter is intentionally left as
+> broad substring (non-destructive search). Matching extracted to a `nameMatches`
+> helper; tested in `kill_test.go` (`ExactPreferredOverSubstring`,
+> `SubstringFallbackIsFuzzy`, plus the existing port/name/numeric cases updated
+> for the new two-value signature).
 
 ## Problem
 
