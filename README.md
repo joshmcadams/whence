@@ -62,6 +62,7 @@ whence list --json          # machine-readable output
 whence list --port 3000     # only this port
 whence list --sort uptime   # sort by port|uptime|name
 whence list --watch         # live-refresh in place (Ctrl-C to stop)
+whence list --no-ignore     # bypass ignore_ports / ignore_names
 
 whence kill 3000            # kill the server on a port
 whence kill myapp           # kill every server in a project
@@ -108,6 +109,15 @@ theme = "indigo"   # indigo | teal | amber | magenta | green | mono
 
 A server is shown by default when its confidence ≥ `confidence_threshold`. Use
 `--all` to see everything.
+
+`ignore_ports` and `ignore_names` suppress matching servers from every listing —
+**including `--all`** — which is the point: system noise (a root-owned Postgres,
+`docker-proxy`) typically only appears under `--all`. `ignore_names` matches a
+process/container name or a project name (case-insensitive). To peek past the
+lists, `whence list --port <n>` still shows a specific ignored port, and
+`whence list --no-ignore` bypasses them entirely. `whence doctor` prints the
+active lists. (Ignore lists never block `whence kill` — an explicit kill always
+targets what you name.)
 
 ## How it works
 

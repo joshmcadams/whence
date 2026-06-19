@@ -53,6 +53,12 @@ func View(servers []model.Server, cfg config.Config, all bool, port int, query s
 		if port > 0 && s.Port != port {
 			continue
 		}
+		// Ignore lists suppress entries even under --all — that's where system
+		// noise (e.g. a root-owned Postgres) shows up. An explicit --port is a
+		// direct request for that port and overrides the ignore list.
+		if port == 0 && isIgnored(s, cfg) {
+			continue
+		}
 		if !all && !classify.Mine(s, cfg) {
 			continue
 		}
@@ -63,6 +69,31 @@ func View(servers []model.Server, cfg config.Config, all bool, port int, query s
 	}
 	Sort(out, "port")
 	return out
+}
+
+// isIgnored reports whether a server is suppressed by the config ignore lists:
+// its port is in IgnorePorts, or its process/container name or project name
+// matches an entry in IgnoreNames (case-insensitive, exact).
+func isIgnored(s model.Server, cfg config.Config) bool {
+	for _, p := range cfg.IgnorePorts {
+		if s.Port == p {
+			return true
+		}
+	}
+	if len(cfg.IgnoreNames) > 0 {
+		name := strings.ToLower(s.Name)
+		disp := strings.ToLower(s.DisplayName())
+		for _, n := range cfg.IgnoreNames {
+			n = strings.ToLower(strings.TrimSpace(n))
+			if n == "" {
+				continue
+			}
+			if name == n || disp == n {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func matchesQuery(s model.Server, q string) bool {

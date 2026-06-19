@@ -20,6 +20,7 @@ type listOpts struct {
 	sortBy   string
 	watch    bool
 	interval time.Duration
+	noIgnore bool
 }
 
 func newListCmd() *cobra.Command {
@@ -39,6 +40,7 @@ func newListCmd() *cobra.Command {
 	f.StringVarP(&o.sortBy, "sort", "s", "port", "sort by: port|uptime|name")
 	f.BoolVarP(&o.watch, "watch", "w", false, "re-render on an interval until interrupted")
 	f.DurationVarP(&o.interval, "interval", "i", 2*time.Second, "refresh interval for --watch")
+	f.BoolVar(&o.noIgnore, "no-ignore", false, "bypass the configured ignore_ports/ignore_names lists")
 	return cmd
 }
 
@@ -72,6 +74,12 @@ func listOnce(cfg config.Config, o *listOpts) ([]model.Server, error) {
 	servers, err := collect(cfg)
 	if err != nil {
 		return nil, err
+	}
+	if o.noIgnore {
+		// cfg is a value copy; clearing the lists disables ignore filtering in
+		// View for this call only, without touching the loaded config.
+		cfg.IgnorePorts = nil
+		cfg.IgnoreNames = nil
 	}
 	servers = inventory.View(servers, cfg, o.all, o.port, "")
 	inventory.Sort(servers, o.sortBy)

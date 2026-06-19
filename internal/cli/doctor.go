@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -36,6 +37,16 @@ func runDoctor() error {
 		row("config file", "found")
 	} else {
 		row("config file", "not present (using defaults)")
+	}
+
+	// Surface active ignore lists: they suppress entries even under --all, so
+	// this is where a user learns why something they expected isn't listed.
+	cfg, _ := config.Load()
+	if len(cfg.IgnorePorts) > 0 {
+		row("ignored ports", fmt.Sprintf("%v (bypass with list --no-ignore)", cfg.IgnorePorts))
+	}
+	if len(cfg.IgnoreNames) > 0 {
+		row("ignored names", strings.Join(cfg.IgnoreNames, ", ")+" (bypass with list --no-ignore)")
 	}
 
 	// macOS leans on lsof for cwd (and possibly socket enumeration).

@@ -1,9 +1,24 @@
 # imp-03 — Implement (or remove) `ignore_ports` / `ignore_names`
 
-**Status:** todo
+**Status:** done (branch `improvements`)
 **Priority:** high — a documented, configurable feature that silently does nothing
 **Category:** correctness / trust
 **Effort:** ~30 min to implement; ~5 min to remove
+
+> **Implemented** (Option A) in the shared `inventory.View` filter via a new
+> `isIgnored` helper, so the CLI and TUI honor the lists identically.
+> `IgnoreNames` matches a process/container name or project name,
+> case-insensitive and **exact** (chosen over substring so suppression is
+> predictable). Semantics confirmed deliberately: ignored entries are hidden
+> **even with `--all`** — that's the point, since the system noise users want to
+> mute (a root-owned Postgres, `docker-proxy`) only surfaces under `--all`.
+> Escape hatches so it isn't a silent footgun: an explicit `whence list
+> --port <n>` still shows an ignored port, `whence list --no-ignore` bypasses the
+> lists entirely (clears them on a cfg value-copy — no signature churn in
+> `View`), and `whence doctor` now prints the active lists. `whence kill` uses
+> the unfiltered inventory, so ignores never block an explicit kill. Tested in
+> `inventory_test.go` (`TestView_IgnorePorts`, `TestView_IgnoreNames`) and
+> smoke-verified end-to-end.
 
 ## Problem
 
