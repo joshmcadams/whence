@@ -20,3 +20,28 @@ throughout (module path, GoReleaser owners, README); the assumed repo name is
 Suggested order: **01 → 04 → 02 → 03** (verify it actually works on the other
 OSes before you publish installable artifacts for them). Item **05** is
 independent code-quality polish — do it whenever.
+
+---
+
+## Improvement suggestions (`imp-*`)
+
+A review of the codebase (code, testing, UX, robustness) produced the following
+suggestions, **ordered most-impactful first**. These are independent of the
+release checklist above and can be done in any order; the numbering only reflects
+priority. Each file is self-contained with file:line touch points and a suggested
+approach.
+
+| # | Item | Category | Effort |
+|---|------|----------|--------|
+| [imp-01](imp-01-timeout-external-commands.md) | Time-bound every external command (a hung Docker daemon hangs the default command) | robustness | ~45 min |
+| [imp-02](imp-02-tui-kill-blast-radius.md) | Show the full kill process tree in the **TUI** confirmation (the CLI already does) | safety | ~1 hr |
+| [imp-03](imp-03-implement-ignore-lists.md) | Implement (or remove) `ignore_ports` / `ignore_names` — documented but dead config | correctness | ~30 min |
+| [imp-04](imp-04-kill-by-name-exact-match.md) | Make `kill <name>` prefer exact matches over substring | safety | ~30 min |
+| [imp-05](imp-05-test-untested-core-packages.md) | Test the 0%-coverage core packages (`config.IsUnderDevRoot`, `output`, `model`, `scan`) | testing | ~2 hr |
+| [imp-06](imp-06-hidden-server-messaging.md) | Tell the user when servers are hidden instead of "nothing found" | UX | ~30 min |
+| [imp-07](imp-07-surface-network-exposure.md) | Surface bind address / network exposure (the data is already collected) | UX | ~45 min |
+| [imp-08](imp-08-eliminate-redundant-work.md) | Eliminate redundant work (cache project detection, share snapshot, overlap scan+docker) | perf | ~1–2 hr |
+| [imp-09](imp-09-polish-grab-bag.md) | Polish grab-bag (version in `doctor`, JSON uptime, watch flicker, …) | polish | small |
+
+The three at the top touch correctness/safety/robustness; **imp-01 → imp-04** are
+the highest-leverage. The rest are quality, testing, and polish.
