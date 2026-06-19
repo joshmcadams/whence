@@ -16,7 +16,11 @@ jobs:
           cache: true
       - uses: golangci/golangci-lint-action@v7
         with:
-          version: v2.6.0
+          version: v2.12.2
+          # No golangci-lint release is built with Go 1.26 yet, and a binary
+          # built with an older Go refuses a module whose go directive is
+          # 1.26. Build it from source with the setup-go toolchain instead.
+          install-mode: goinstall
 
   test:
     runs-on: ubuntu-latest
