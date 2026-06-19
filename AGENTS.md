@@ -122,9 +122,12 @@ nothing below `inventory` should import `cli`, `tui`, or `inventory`.
   enumerates the full tree (climbed root + descendants, with a process count) so
   you see every process before agreeing. The preview and the kill share
   `kill.planTree`, so they can't disagree (see `internal/kill/AGENTS.md`).
-- **A process bound to both IPv4 and IPv6 can show as two rows** (`tcp` +
-  `tcp6`), since scan dedup keys on proto. May be intentional (per-stack
-  visibility) — confirm intent before collapsing.
+- **Dual-stack servers (bound to both IPv4 and IPv6) collapse to one row.**
+  `scan.collapseIPv4IPv6` merges `(port, pid)` pairs where both stacks share
+  the same exposure class — `0.0.0.0`+`::` → `tcp`/`0.0.0.0`; `127.0.0.1`+`::1`
+  → `tcp`/`127.0.0.1`. Genuinely distinct IP bindings and unattributed rows
+  (PID ≤ 0) are left untouched. This is intentional — do not revert to the
+  old per-proto dedup key without updating `scan_test.go`.
 - **macOS cwd needs `lsof`**; Windows cwd reads the PEB via gopsutil and is the
   least-exercised path. `doctor` reports both.
 

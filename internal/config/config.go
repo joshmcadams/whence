@@ -122,6 +122,11 @@ func (c Config) IsUnderDevRoot(dir string) bool {
 	return false
 }
 
+// normalize lowercases the path so that ~/Development and ~/development both
+// match a configured dev root, and so that case-insensitive filesystems
+// (macOS, Windows) work correctly. On a case-sensitive Linux filesystem this
+// means ~/Dev and ~/dev would collude if both appeared as dev roots — an
+// accepted trade-off given how rare that configuration is in practice.
 func normalize(p string) string {
 	abs, err := filepath.Abs(p)
 	if err != nil {

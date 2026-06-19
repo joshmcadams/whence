@@ -53,6 +53,7 @@ func Processes() ([]model.Server, error) {
 		servers = append(servers, s)
 	}
 
+	servers = collapseIPv4IPv6(servers)
 	sort.Slice(servers, func(i, j int) bool {
 		if servers[i].Port != servers[j].Port {
 			return servers[i].Port < servers[j].Port
@@ -60,6 +61,42 @@ func Processes() ([]model.Server, error) {
 		return servers[i].Proto < servers[j].Proto
 	})
 	return servers, nil
+}
+
+// collapseIPv4IPv6 merges (port, pid) pairs where the tcp and tcp6 entries
+// have the same exposure class (both all-interfaces or both loopback). This is
+// the common dual-stack case — Vite, most Node servers — where two identical
+// rows appear for one server. The surviving entry is normalized to the IPv4
+// representation (proto=tcp, address=0.0.0.0 or 127.0.0.1).
+// Entries with PID ≤ 0 (unattributed) and genuinely distinct IP bindings are
+// left untouched.
+func collapseIPv4IPv6(servers []model.Server) []model.Server {
+	type key struct{ port, pid int }
+	idx := map[key]int{} // key → index in out
+	out := make([]model.Server, 0, len(servers))
+	for _, s := range servers {
+		if s.PID > 0 {
+			k := key{s.Port, s.PID}
+			if i, exists := idx[k]; exists {
+				existing := &out[i]
+				if s.Exposure() == existing.Exposure() {
+					switch s.Exposure() {
+					case "all":
+						existing.Proto = "tcp"
+						existing.Address = "0.0.0.0"
+					case "local":
+						existing.Proto = "tcp"
+						existing.Address = "127.0.0.1"
+					}
+					continue
+				}
+			} else {
+				idx[k] = len(out)
+			}
+		}
+		out = append(out, s)
+	}
+	return out
 }
 
 // enrich fills process-level detail, accumulating non-fatal notes.
