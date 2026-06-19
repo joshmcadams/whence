@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"sort"
 	"testing"
+
+	"github.com/joshmcadams/whence/internal/model"
 )
 
 // table builds a procTable from parent/name maps for testing.
@@ -86,5 +88,28 @@ func TestSubtree(t *testing.T) {
 	want := []int{200, 300, 400, 500}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("subtree = %v, want %v", got, want)
+	}
+}
+
+func TestPreviewWith_ClimbsTree(t *testing.T) {
+	// bash(100) -> npm(200) -> node(300, listener). previewWith should climb to
+	// npm (200) and include node (300) in the tree.
+	tbl := table(
+		map[int]int{200: 100, 300: 200, 100: 1},
+		map[int]string{100: "bash", 200: "npm", 300: "node"},
+	)
+	s := model.Server{Source: model.SourceProcess, PID: 300, Port: 3000}
+	plan := previewWith(s, Opts{}, tbl)
+	if len(plan.Tree) == 0 {
+		t.Fatal("expected non-empty tree")
+	}
+	pids := make([]int, len(plan.Tree))
+	for i, m := range plan.Tree {
+		pids[i] = m.PID
+	}
+	sort.Ints(pids)
+	want := []int{200, 300}
+	if !reflect.DeepEqual(pids, want) {
+		t.Errorf("tree pids = %v, want %v", pids, want)
 	}
 }

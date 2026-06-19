@@ -158,11 +158,10 @@ func dedupeUnits(servers []model.Server) []model.Server {
 // launcher and takes the whole subtree, one listening server can mean several
 // processes; the user sees them all before agreeing.
 func confirmKill(units []model.Server, target string, fuzzy bool, opts kill.Opts) bool {
-	plans := make([]kill.Plan, len(units))
+	plans := kill.PreviewBatch(units, opts)
 	totalProcs := 0
-	for i, s := range units {
-		plans[i] = kill.Preview(s, opts)
-		totalProcs += len(plans[i].Tree)
+	for _, p := range plans {
+		totalProcs += len(p.Tree)
 	}
 
 	if fuzzy {

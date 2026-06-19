@@ -43,13 +43,14 @@ var devCmdHints = []string{
 // project from each server's cwd. Docker servers are scored in the docker
 // package and should not be passed here.
 func Process(servers []model.Server, cfg config.Config) {
+	cache := project.NewCache()
 	for i := range servers {
 		s := &servers[i]
 		if s.Source != model.SourceProcess {
 			continue
 		}
 		if s.Cwd != "" {
-			s.Project = project.Detect(s.Cwd)
+			s.Project = cache.Detect(s.Cwd)
 		}
 		s.Confidence = scoreProcess(*s, cfg)
 	}

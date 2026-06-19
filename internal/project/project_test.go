@@ -86,3 +86,29 @@ func TestName_FallsBackToDirBasename(t *testing.T) {
 		t.Errorf("name = %q, want myproj", got)
 	}
 }
+
+func TestCache_SameRootReturnsSamePointer(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sub1 := filepath.Join(root, "backend")
+	sub2 := filepath.Join(root, "frontend")
+	if err := os.MkdirAll(sub1, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(sub2, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	c := NewCache()
+	p1 := c.Detect(sub1)
+	p2 := c.Detect(sub2)
+
+	if p1 == nil {
+		t.Fatal("expected non-nil project for sub1")
+	}
+	if p1 != p2 {
+		t.Error("same repo root: expected same *Project pointer (cache hit), got different allocations")
+	}
+}

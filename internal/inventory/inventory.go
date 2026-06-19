@@ -18,14 +18,22 @@ import (
 // with Docker/compose servers. When a host port is published by a container,
 // the container entry supersedes the native docker-proxy listener on that port.
 func Collect(cfg config.Config) ([]model.Server, error) {
+	// Start docker scan concurrently; it's independent of the native scan and
+	// often slower (daemon round-trip), so overlapping the two saves wall time.
+	type dockerResult struct{ servers []model.Server }
+	dockerCh := make(chan dockerResult, 1)
+	go func() {
+		s, _ := docker.Servers() // best-effort; error deliberately ignored
+		dockerCh <- dockerResult{s}
+	}()
+
 	procs, err := scan.Processes()
 	if err != nil {
 		return nil, err
 	}
 	classify.Process(procs, cfg)
 
-	// Docker is best-effort: its absence or failure must not break the listing.
-	dockers, _ := docker.Servers()
+	dockers := (<-dockerCh).servers
 
 	dockerPorts := make(map[int]bool, len(dockers))
 	for _, d := range dockers {

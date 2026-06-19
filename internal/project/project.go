@@ -13,6 +13,38 @@ import (
 	"github.com/joshmcadams/whence/internal/model"
 )
 
+// Cache memoises project detection keyed by resolved repo root so that multiple
+// servers sharing a root (e.g. a monorepo's web + api processes) only pay the
+// disk-read cost once per Collect invocation.
+type Cache struct {
+	byRoot map[string]*model.Project
+}
+
+// NewCache returns an empty Cache ready for a single Collect invocation.
+func NewCache() *Cache { return &Cache{byRoot: map[string]*model.Project{}} }
+
+// Detect is the memoised form of the package-level Detect function.
+func (c *Cache) Detect(startDir string) *model.Project {
+	if startDir == "" {
+		return nil
+	}
+	root, marker := findRoot(startDir)
+	if root == "" {
+		return nil
+	}
+	if p, ok := c.byRoot[root]; ok {
+		return p
+	}
+	p := &model.Project{
+		Name:        name(root),
+		Root:        root,
+		Description: Description(root),
+		Marker:      marker,
+	}
+	c.byRoot[root] = p
+	return p
+}
+
 // manifests are non-.git markers that also indicate a project root, in priority
 // order (used when no .git is found while walking up).
 var manifests = []string{

@@ -61,7 +61,30 @@ func Preview(s model.Server, o Opts) Plan {
 	if s.PID <= 0 {
 		return Plan{Server: s, NoPID: true}
 	}
+	return previewWith(s, o, snapshot())
+}
+
+// PreviewBatch computes Plans for multiple servers with a single process-table
+// snapshot, avoiding the N-snapshot cost when previewing a multi-port kill.
+func PreviewBatch(servers []model.Server, o Opts) []Plan {
 	tbl := snapshot()
+	plans := make([]Plan, len(servers))
+	for i, s := range servers {
+		if s.Source == model.SourceDocker {
+			plans[i] = Plan{Server: s, Docker: true}
+			continue
+		}
+		if s.PID <= 0 {
+			plans[i] = Plan{Server: s, NoPID: true}
+			continue
+		}
+		plans[i] = previewWith(s, o, tbl)
+	}
+	return plans
+}
+
+// previewWith computes a Plan from an already-taken process-table snapshot.
+func previewWith(s model.Server, o Opts, tbl procTable) Plan {
 	pids := planTree(s.PID, o.Single, tbl)
 	tree := make([]TreeMember, len(pids))
 	for i, p := range pids {
