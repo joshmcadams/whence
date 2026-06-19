@@ -51,11 +51,13 @@ type Model struct {
 	table table.Model
 	ti    textinput.Model
 
-	mode     mode
-	all      bool
-	query    string
-	selected pm.Server
-	theme    Theme
+	mode       mode
+	all        bool
+	query      string
+	selected   pm.Server
+	plan       kill.Plan // blast radius for the pending confirm
+	killSingle bool      // confirm-time toggle: listener-only vs whole tree
+	theme      Theme
 
 	status string
 	err    error
@@ -123,12 +125,18 @@ func loadCmd(cfg config.Config) tea.Cmd {
 	}
 }
 
-func killCmd(cfg config.Config, s pm.Server) tea.Cmd {
+func killCmd(s pm.Server, opts kill.Opts) tea.Cmd {
 	return func() tea.Msg {
-		res := kill.Server(s, kill.Opts{
-			Timeout: time.Duration(cfg.KillTimeoutSeconds) * time.Second,
-		})
+		res := kill.Server(s, opts)
 		return killedMsg{res: res}
+	}
+}
+
+// killOpts builds the kill options from config and the confirm-time single toggle.
+func (m Model) killOpts() kill.Opts {
+	return kill.Opts{
+		Timeout: time.Duration(m.cfg.KillTimeoutSeconds) * time.Second,
+		Single:  m.killSingle,
 	}
 }
 
@@ -216,9 +224,18 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case modeConfirm:
 		switch strings.ToLower(msg.String()) {
 		case "y", "yes":
+			opts := m.killOpts()
 			m.mode = modeList
 			m.status = "killing " + describe(m.selected) + "…"
-			return m, killCmd(m.cfg, m.selected)
+			return m, killCmd(m.selected, opts)
+		case "s":
+			// Toggle whole-tree vs listener-only (native processes only) and
+			// re-preview so the box reflects the new scope.
+			if !m.plan.Docker && !m.plan.NoPID {
+				m.killSingle = !m.killSingle
+				m.plan = kill.Preview(m.selected, m.killOpts())
+			}
+			return m, nil
 		default: // n, esc, anything
 			m.mode = modeList
 			return m, nil
@@ -253,6 +270,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "x":
 		if s, ok := m.current(); ok {
 			m.selected = s
+			m.killSingle = false
+			m.plan = kill.Preview(s, m.killOpts())
 			m.mode = modeConfirm
 		}
 		return m, nil
@@ -321,8 +340,7 @@ func (m Model) View() string {
 	case modeFilter:
 		b.WriteString(m.ti.View() + "\n")
 	case modeConfirm:
-		prompt := fmt.Sprintf("Kill %s ?  [y/N]", describe(m.selected))
-		b.WriteString(confirmBox.Render(prompt) + "\n")
+		b.WriteString(m.confirmView() + "\n")
 	}
 
 	b.WriteString(m.footerView())
@@ -351,6 +369,49 @@ func (m Model) footerView() string {
 		return m.status + "\n" + help
 	}
 	return help
+}
+
+// maxConfirmTreeLines caps how many tree rows the confirm box renders so a large
+// blast radius can't push the [y/N] prompt off-screen; the header still states
+// the true total.
+const maxConfirmTreeLines = 12
+
+// confirmView renders the kill confirmation: the target, the full process tree
+// it will signal (the blast radius), the current scope, and the prompt. It uses
+// the same kill.Plan the actual kill will act on, so it can't understate what
+// dies — the safety property the CLI confirmation already has.
+func (m Model) confirmView() string {
+	p := m.plan
+	var b strings.Builder
+
+	head := "Kill " + describe(m.selected)
+	if !p.Docker && !p.NoPID && len(p.Tree) > 1 {
+		head += fmt.Sprintf(" — %d processes", len(p.Tree))
+	}
+	b.WriteString(head + "\n")
+
+	lines := p.Lines()
+	shown := lines
+	if len(shown) > maxConfirmTreeLines {
+		shown = shown[:maxConfirmTreeLines]
+	}
+	for _, line := range shown {
+		b.WriteString("  " + dimStyle.Render(line) + "\n")
+	}
+	if len(lines) > len(shown) {
+		b.WriteString("  " + dimStyle.Render(fmt.Sprintf("… +%d more", len(lines)-len(shown))) + "\n")
+	}
+
+	// Scope toggle is meaningful only for native process trees.
+	if !p.Docker && !p.NoPID {
+		scope := "whole tree"
+		if m.killSingle {
+			scope = "listener only"
+		}
+		b.WriteString(dimStyle.Render("scope: "+scope+" · s to toggle") + "\n")
+	}
+	b.WriteString("[y/N]")
+	return confirmBox.Render(b.String())
 }
 
 func (m Model) detailView() string {

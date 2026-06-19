@@ -155,23 +155,8 @@ func confirmKill(units []model.Server, target string, opts kill.Opts) bool {
 
 func printPlan(p kill.Plan) {
 	fmt.Printf("  %s\n", describe(p.Server))
-	switch {
-	case p.Docker:
-		fmt.Println("      docker stop")
-	case p.NoPID:
-		fmt.Println("      no accessible pid (owned by another user; try elevated privileges)")
-	default:
-		for i, m := range p.Tree {
-			name := m.Name
-			if name == "" {
-				name = "?"
-			}
-			tag := ""
-			if i == 0 && len(p.Tree) > 1 {
-				tag = "  (tree root)"
-			}
-			fmt.Printf("      %d %s%s\n", m.PID, name, tag)
-		}
+	for _, line := range p.Lines() {
+		fmt.Printf("      %s\n", line)
 	}
 }
 

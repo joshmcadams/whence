@@ -70,6 +70,33 @@ func Preview(s model.Server, o Opts) Plan {
 	return Plan{Server: s, Tree: tree}
 }
 
+// Lines renders what this Plan will do, for a confirmation prompt: a single
+// action line for a container or a no-pid server, otherwise one line per process
+// in the kill tree (the climbed root tagged when there's more than one). Shared
+// by the CLI and TUI confirmations so neither can understate the blast radius.
+func (p Plan) Lines() []string {
+	switch {
+	case p.Docker:
+		return []string{"docker stop"}
+	case p.NoPID:
+		return []string{"no accessible pid (owned by another user; try elevated privileges)"}
+	default:
+		lines := make([]string, len(p.Tree))
+		for i, m := range p.Tree {
+			name := m.Name
+			if name == "" {
+				name = "?"
+			}
+			tag := ""
+			if i == 0 && len(p.Tree) > 1 {
+				tag = "  (tree root)"
+			}
+			lines[i] = fmt.Sprintf("%d %s%s", m.PID, name, tag)
+		}
+		return lines
+	}
+}
+
 // launchers are wrapper processes we will climb through to find the tree head.
 // Shells (bash/zsh/sh/fish/pwsh/cmd) are deliberately absent: climbing stops at
 // them so an interactive session is never killed.

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -80,6 +81,44 @@ func TestConfirmCancel(t *testing.T) {
 	m = step(m, key("n"))
 	if m.mode != modeList {
 		t.Errorf("mode = %v, want modeList after n", m.mode)
+	}
+}
+
+func TestConfirmPreviewsBlastRadius(t *testing.T) {
+	m := step(newLoaded(), key("x"))
+	if m.mode != modeConfirm {
+		t.Fatalf("mode = %v, want modeConfirm after x", m.mode)
+	}
+	// The confirm must be backed by the same plan the kill will act on, so it
+	// can't understate what dies (the safety property the CLI already has).
+	if len(m.plan.Tree) == 0 {
+		t.Fatal("plan.Tree is empty — confirmation would hide the blast radius")
+	}
+	found := false
+	for _, tm := range m.plan.Tree {
+		if tm.PID == 100 { // the selected listener
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("selected listener pid 100 not in previewed tree %+v", m.plan.Tree)
+	}
+	if !strings.Contains(m.View(), "100") {
+		t.Error("confirm view does not render the pid; blast radius not shown to the user")
+	}
+}
+
+func TestConfirmSingleToggle(t *testing.T) {
+	m := step(newLoaded(), key("x"))
+	if m.killSingle {
+		t.Fatal("kill should default to the whole tree, not single")
+	}
+	m = step(m, key("s"))
+	if !m.killSingle {
+		t.Error("'s' in the confirm should toggle to listener-only")
+	}
+	if m.mode != modeConfirm || len(m.plan.Tree) == 0 {
+		t.Errorf("after toggle: mode=%v treelen=%d, want still confirming with a tree", m.mode, len(m.plan.Tree))
 	}
 }
 

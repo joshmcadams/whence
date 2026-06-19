@@ -1,9 +1,19 @@
 # imp-02 — Show the full kill blast radius in the TUI confirmation
 
-**Status:** todo
+**Status:** done (branch `improvements`)
 **Priority:** high — safety; the TUI can kill more than it shows
 **Category:** UX / safety
 **Effort:** ~1 hr
+
+> **Implemented.** The TUI now computes `kill.Preview` on `x` and renders the
+> full process tree (root tagged, count in the header) in the confirm box, so it
+> can no longer understate what dies. The tree formatting is shared via a new
+> `kill.Plan.Lines()` used by both the CLI's `printPlan` and the TUI, so the two
+> confirmations can't drift. Added the CLI's `--single` equivalent: `s` in the
+> confirm toggles whole-tree vs listener-only and re-previews. A large tree is
+> capped at 12 visible rows (with `… +N more`) so the prompt stays on-screen,
+> while the header still states the true total. Tested in `tui_test.go`
+> (`TestConfirmPreviewsBlastRadius`, `TestConfirmSingleToggle`).
 
 ## Problem
 
