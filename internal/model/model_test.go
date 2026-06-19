@@ -31,6 +31,28 @@ func TestDescription(t *testing.T) {
 	}
 }
 
+func TestExposure(t *testing.T) {
+	cases := []struct {
+		addr string
+		want string
+	}{
+		{"127.0.0.1", "local"},
+		{"::1", "local"},
+		{"localhost", "local"},
+		{"0.0.0.0", "all"},
+		{"::", "all"},
+		{"", "all"},
+		{"192.168.1.5", "192.168.1.5"},
+		{"10.0.0.1", "10.0.0.1"},
+	}
+	for _, tc := range cases {
+		s := Server{Address: tc.addr}
+		if got := s.Exposure(); got != tc.want {
+			t.Errorf("Exposure(%q) = %q, want %q", tc.addr, got, tc.want)
+		}
+	}
+}
+
 func TestAttributed(t *testing.T) {
 	if !(Server{PID: 42}).Attributed() {
 		t.Error("PID 42 should be attributed")

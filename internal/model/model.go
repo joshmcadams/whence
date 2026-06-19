@@ -64,3 +64,17 @@ type Project struct {
 
 // Attributed reports whether we managed to identify the owning process.
 func (s Server) Attributed() bool { return s.PID > 0 }
+
+// Exposure classifies the bind address for display.
+// "local" means loopback only; "all" means any interface (reachable off-box);
+// anything else is the literal IP of a specific bound interface.
+func (s Server) Exposure() string {
+	switch s.Address {
+	case "127.0.0.1", "::1", "localhost":
+		return "local"
+	case "", "0.0.0.0", "::":
+		return "all"
+	default:
+		return s.Address
+	}
+}

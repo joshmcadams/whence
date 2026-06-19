@@ -145,6 +145,21 @@ func TestQuitKeys(t *testing.T) {
 	}
 }
 
+func TestDetailViewShowsBind(t *testing.T) {
+	m := newLoaded() // row 0 is port 5173, Address=""  → Exposure()="all"
+	m = step(m, key("enter"))
+	if m.mode != modeDetail {
+		t.Fatalf("mode = %v, want modeDetail", m.mode)
+	}
+	v := m.View()
+	if !strings.Contains(v, "Bind") {
+		t.Errorf("detail view missing Bind field:\n%s", v)
+	}
+	if !strings.Contains(v, "all") && !strings.Contains(v, "local") {
+		t.Errorf("detail view missing exposure value (all/local):\n%s", v)
+	}
+}
+
 func TestEmptyViewShowsHint(t *testing.T) {
 	// All servers below threshold → rows is empty but raw is not.
 	m := New(config.Config{ConfidenceThreshold: 50}, false)

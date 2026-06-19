@@ -313,12 +313,16 @@ func (m *Model) rebuild() {
 	descW := descWidth(m.width)
 	rows := make([]table.Row, len(m.rows))
 	for i, s := range m.rows {
+		name := s.DisplayName()
+		if s.Exposure() == "all" {
+			name += " [!]"
+		}
 		rows[i] = table.Row{
 			fmt.Sprintf("%d", s.Port),
 			s.Proto,
 			output.HumanUptime(s.Uptime),
 			output.SrcLabel(s.Source),
-			s.DisplayName(),
+			name,
 			output.Truncate(s.Description(), descW),
 		}
 	}
@@ -429,6 +433,7 @@ func (m Model) detailView() string {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("whence — detail") + "\n\n")
 	b.WriteString(row("Port", fmt.Sprintf("%d/%s", s.Port, s.Proto)) + "\n")
+	b.WriteString(row("Bind", s.Exposure()) + "\n")
 	b.WriteString(row("Server", s.DisplayName()) + "\n")
 	b.WriteString(row("Source", output.SrcLabel(s.Source)) + "\n")
 	if s.Source == pm.SourceDocker {

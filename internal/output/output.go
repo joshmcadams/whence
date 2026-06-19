@@ -39,6 +39,9 @@ func Table(w io.Writer, servers []model.Server, hidden int) {
 		if name == "" {
 			name = "-"
 		}
+		if s.Exposure() == "all" {
+			name += " [!]"
+		}
 		desc := s.Description()
 		if desc == "" {
 			desc = note(s)

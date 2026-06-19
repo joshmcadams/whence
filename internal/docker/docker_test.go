@@ -31,6 +31,32 @@ func TestHostPorts_DedupesV4V6AndSkipsUDP(t *testing.T) {
 	}
 }
 
+func TestHostPorts_CapturesAddress(t *testing.T) {
+	var c inspect
+	c.NetworkSettings.Ports = map[string][]struct {
+		HostIP   string `json:"HostIp"`
+		HostPort string `json:"HostPort"`
+	}{
+		// Loopback-only binding.
+		"5432/tcp": {{HostIP: "127.0.0.1", HostPort: "5433"}},
+		// All-interfaces: two bindings (v4 + v6) for the same host port.
+		"6379/tcp": {{HostIP: "0.0.0.0", HostPort: "6379"}, {HostIP: "::", HostPort: "6379"}},
+	}
+
+	got := hostPorts(c)
+	addrs := map[int]string{}
+	for _, p := range got {
+		addrs[p.port] = p.address
+	}
+
+	if addrs[5433] != "127.0.0.1" {
+		t.Errorf("port 5433 address = %q, want 127.0.0.1", addrs[5433])
+	}
+	if addrs[6379] != "0.0.0.0" {
+		t.Errorf("port 6379 address = %q, want 0.0.0.0 (all-interfaces)", addrs[6379])
+	}
+}
+
 func TestClassifyContainer(t *testing.T) {
 	var c inspect
 	c.Name = "/jfdid-db-1"

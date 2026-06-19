@@ -79,6 +79,7 @@ func Servers() ([]model.Server, error) {
 			s := model.Server{
 				Port:       hp.port,
 				Proto:      hp.proto,
+				Address:    hp.address,
 				Source:     model.SourceDocker,
 				Name:       name,
 				Cmdline:    c.Config.Image,
@@ -126,15 +127,17 @@ func isKubernetes(c inspect) bool {
 }
 
 type portMap struct {
-	port  int
-	proto string
+	port    int
+	proto   string
+	address string
 }
 
-// hostPorts returns the deduped set of published host ports for a container.
-// A single container port often binds both IPv4 and IPv6 to the same host port.
+// hostPorts returns the deduped set of published host ports for a container,
+// capturing the bind address. When a port is bound to both IPv4 and IPv6
+// all-interfaces addresses, the address is normalised to "0.0.0.0".
 func hostPorts(c inspect) []portMap {
-	seen := map[string]bool{}
-	var out []portMap
+	acc := map[string]*portMap{}
+	var order []string
 	for key, binds := range c.NetworkSettings.Ports {
 		proto := "tcp"
 		if i := strings.IndexByte(key, '/'); i >= 0 {
@@ -152,14 +155,30 @@ func hostPorts(c inspect) []portMap {
 				continue
 			}
 			k := strconv.Itoa(p) + "/" + proto
-			if seen[k] {
-				continue
+			if e, ok := acc[k]; ok {
+				// Upgrade to all-interfaces if any binding is open to all.
+				if isAllInterfacesIP(b.HostIP) && !isAllInterfacesIP(e.address) {
+					e.address = "0.0.0.0"
+				}
+			} else {
+				addr := b.HostIP
+				if isAllInterfacesIP(addr) {
+					addr = "0.0.0.0"
+				}
+				acc[k] = &portMap{port: p, proto: proto, address: addr}
+				order = append(order, k)
 			}
-			seen[k] = true
-			out = append(out, portMap{port: p, proto: proto})
 		}
 	}
+	out := make([]portMap, 0, len(order))
+	for _, k := range order {
+		out = append(out, *acc[k])
+	}
 	return out
+}
+
+func isAllInterfacesIP(ip string) bool {
+	return ip == "" || ip == "0.0.0.0" || ip == "::"
 }
 
 func runningIDs() ([]string, error) {
