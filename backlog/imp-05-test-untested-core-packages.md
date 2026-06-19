@@ -1,9 +1,23 @@
 # imp-05 — Test the untested core packages
 
-**Status:** todo
+**Status:** done (branch `improvements`)
 **Priority:** medium-high — core logic with subtle edges is currently unguarded
 **Category:** testing
 **Effort:** ~2 hr
+
+> **Implemented.** Coverage of the four targets went from 0% to: `config` 75%,
+> `output` 88%, `model` 100%, `scan` 7% (only `protoOf` is unit-testable; the
+> rest is live-system cwd/socket code, as anticipated — not worth mocking).
+> - `config_test.go`: `IsUnderDevRoot` table including the `~/dev` vs `~/devil`
+>   boundary, ancestor/empty/unrelated cases, and the case-insensitive match
+>   (encoding the backlog-05 trade-off so it can't be "fixed" by accident);
+>   `Load` missing-file→defaults and partial-file overlay; `Save`/`Load`
+>   round-trip; `Path` shape (all via a temp `XDG_CONFIG_HOME`).
+> - `output_test.go`: `HumanUptime` boundaries (59s/60s/59m/1h/1d…), `Truncate`
+>   (exact length, ellipsis, `n<=1`, multi-byte runes), `SrcLabel`, `Table`
+>   empty + row, and a `JSON` field-name contract test (locks `uptimeNs` etc.).
+> - `model_test.go`: `DisplayName` / `Description` / `Attributed`.
+> - `scan_test.go`: `protoOf` family→tcp/tcp6 mapping.
 
 ## Problem
 
