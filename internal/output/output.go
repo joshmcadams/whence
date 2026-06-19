@@ -18,11 +18,18 @@ func JSON(w io.Writer, servers []model.Server) error {
 	return enc.Encode(servers)
 }
 
-// Table writes a human-readable table. In Phase 1 the columns reflect raw
-// discovery; project name/description columns arrive with Phase 2.
-func Table(w io.Writer, servers []model.Server) {
+// Table writes a human-readable table. hidden is the count of servers that
+// exist in the inventory but were filtered out by the confidence threshold;
+// when non-zero and the table is empty, a hint is printed instead of the
+// generic "nothing found" message.
+func Table(w io.Writer, servers []model.Server, hidden int) {
 	if len(servers) == 0 {
-		fmt.Fprintln(w, "No listening servers found.")
+		if hidden > 0 {
+			fmt.Fprintf(w, "No servers matched (%d listening port(s) hidden below the confidence threshold).\n", hidden)
+			fmt.Fprintln(w, "Run `whence list --all` to see everything, or lower confidence_threshold.")
+		} else {
+			fmt.Fprintln(w, "No listening servers found.")
+		}
 		return
 	}
 	tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)

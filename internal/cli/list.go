@@ -59,21 +59,21 @@ func runListWith(o *listOpts) error {
 		return watchList(cfg, o)
 	}
 
-	servers, err := listOnce(cfg, o)
+	servers, hidden, err := listOnce(cfg, o)
 	if err != nil {
 		return err
 	}
 	if o.asJSON {
 		return output.JSON(os.Stdout, servers)
 	}
-	output.Table(os.Stdout, servers)
+	output.Table(os.Stdout, servers, hidden)
 	return nil
 }
 
-func listOnce(cfg config.Config, o *listOpts) ([]model.Server, error) {
-	servers, err := collect(cfg)
+func listOnce(cfg config.Config, o *listOpts) ([]model.Server, int, error) {
+	raw, err := collect(cfg)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if o.noIgnore {
 		// cfg is a value copy; clearing the lists disables ignore filtering in
@@ -81,22 +81,28 @@ func listOnce(cfg config.Config, o *listOpts) ([]model.Server, error) {
 		cfg.IgnorePorts = nil
 		cfg.IgnoreNames = nil
 	}
-	servers = inventory.View(servers, cfg, o.all, o.port, "")
+	servers := inventory.View(raw, cfg, o.all, o.port, "")
 	inventory.Sort(servers, o.sortBy)
-	return servers, nil
+
+	hidden := 0
+	if !o.all {
+		allView := inventory.View(raw, cfg, true, o.port, "")
+		hidden = len(allView) - len(servers)
+	}
+	return servers, hidden, nil
 }
 
 // watchList re-renders the table on an interval until interrupted (Ctrl-C).
 func watchList(cfg config.Config, o *listOpts) error {
 	for {
-		servers, err := listOnce(cfg, o)
+		servers, hidden, err := listOnce(cfg, o)
 		if err != nil {
 			return err
 		}
 		fmt.Print("\033[H\033[2J") // home + clear screen
 		fmt.Printf("whence — %s (every %s, Ctrl-C to stop)\n\n",
 			time.Now().Format("15:04:05"), o.interval)
-		output.Table(os.Stdout, servers)
+		output.Table(os.Stdout, servers, hidden)
 		time.Sleep(o.interval)
 	}
 }

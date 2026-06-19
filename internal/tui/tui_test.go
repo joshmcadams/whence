@@ -145,6 +145,57 @@ func TestQuitKeys(t *testing.T) {
 	}
 }
 
+func TestEmptyViewShowsHint(t *testing.T) {
+	// All servers below threshold → rows is empty but raw is not.
+	m := New(config.Config{ConfidenceThreshold: 50}, false)
+	m = step(m, tea.WindowSizeMsg{Width: 100, Height: 24})
+	m = step(m, loadedMsg{servers: []pm.Server{
+		{Port: 9999, Proto: "tcp", Source: pm.SourceProcess, Confidence: 0},
+	}})
+	if len(m.rows) != 0 {
+		t.Fatalf("expected 0 rows, got %d", len(m.rows))
+	}
+	if len(m.raw) == 0 {
+		t.Fatal("raw should be non-empty")
+	}
+	v := m.View()
+	if !strings.Contains(v, "press a") {
+		t.Errorf("hint absent from view:\n%s", v)
+	}
+}
+
+func TestHintAbsentWhenAll(t *testing.T) {
+	// Same inventory, but all=true → nothing is hidden, hint must not appear.
+	m := New(config.Config{ConfidenceThreshold: 50}, true)
+	m = step(m, tea.WindowSizeMsg{Width: 100, Height: 24})
+	m = step(m, loadedMsg{servers: []pm.Server{
+		{Port: 9999, Proto: "tcp", Source: pm.SourceProcess, Confidence: 0},
+	}})
+	v := m.View()
+	if strings.Contains(v, "press a to show all") {
+		t.Errorf("hint must not appear when all=true:\n%s", v)
+	}
+}
+
+func TestHintAbsentWhenQueryFilters(t *testing.T) {
+	// Query filters everything out — "press a" wouldn't help; hint must not appear.
+	m := New(config.Config{ConfidenceThreshold: 50}, false)
+	m = step(m, tea.WindowSizeMsg{Width: 100, Height: 24})
+	m = step(m, loadedMsg{servers: []pm.Server{
+		{Port: 5173, Proto: "tcp", PID: 100, Source: pm.SourceProcess, Confidence: 100,
+			Project: &pm.Project{Name: "myapp"}},
+	}})
+	m = step(m, key("/"))
+	m = step(m, key("zzz")) // no match
+	if m.query == "" {
+		t.Fatal("query should be set")
+	}
+	v := m.View()
+	if strings.Contains(v, "press a to show all") {
+		t.Errorf("hint must not appear when query is active:\n%s", v)
+	}
+}
+
 func TestFilterNarrows(t *testing.T) {
 	m := step(newLoaded(), key("/"))
 	if m.mode != modeFilter {

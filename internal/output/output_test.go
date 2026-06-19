@@ -68,9 +68,23 @@ func TestSrcLabel(t *testing.T) {
 
 func TestTable_Empty(t *testing.T) {
 	var buf bytes.Buffer
-	Table(&buf, nil)
+	Table(&buf, nil, 0)
 	if !strings.Contains(buf.String(), "No listening servers found.") {
 		t.Errorf("empty table = %q", buf.String())
+	}
+}
+
+func TestTable_HiddenHint(t *testing.T) {
+	var buf bytes.Buffer
+	Table(&buf, nil, 3)
+	out := buf.String()
+	if strings.Contains(out, "No listening servers found.") {
+		t.Error("should not print the generic empty message when servers are hidden")
+	}
+	for _, want := range []string{"3", "confidence_threshold", "--all"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("hidden hint missing %q in:\n%s", want, out)
+		}
 	}
 }
 
@@ -80,7 +94,7 @@ func TestTable_RendersRow(t *testing.T) {
 			Project: &model.Project{Name: "myapp", Description: "a cool app"}},
 	}
 	var buf bytes.Buffer
-	Table(&buf, servers)
+	Table(&buf, servers, 0)
 	out := buf.String()
 	for _, want := range []string{"PORT", "PROTO", "SERVER", "DESCRIPTION", "3000", "myapp", "a cool app", "proc"} {
 		if !strings.Contains(out, want) {

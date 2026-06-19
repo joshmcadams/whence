@@ -335,6 +335,10 @@ func (m Model) View() string {
 	var b strings.Builder
 	b.WriteString(m.headerView() + "\n")
 	b.WriteString(m.table.View() + "\n")
+	if len(m.rows) == 0 && len(m.raw) > 0 && !m.all && m.query == "" {
+		hint := fmt.Sprintf("  0 of %d shown — press a to show all", len(m.raw))
+		b.WriteString(dimStyle.Render(hint) + "\n")
+	}
 
 	switch m.mode {
 	case modeFilter:
