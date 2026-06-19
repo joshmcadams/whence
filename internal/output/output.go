@@ -11,11 +11,23 @@ import (
 	"github.com/joshmcadams/whence/internal/model"
 )
 
+// serverJSON wraps model.Server for JSON output, adding a human-readable
+// "uptime" string alongside the existing "uptimeNs" nanosecond field.
+// Both fields are kept for compatibility; consumers should prefer "uptime".
+type serverJSON struct {
+	model.Server
+	UptimeHuman string `json:"uptime"`
+}
+
 // JSON writes servers as indented JSON.
 func JSON(w io.Writer, servers []model.Server) error {
+	wrapped := make([]serverJSON, len(servers))
+	for i, s := range servers {
+		wrapped[i] = serverJSON{Server: s, UptimeHuman: HumanUptime(s.Uptime)}
+	}
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
-	return enc.Encode(servers)
+	return enc.Encode(wrapped)
 }
 
 // Table writes a human-readable table. hidden is the count of servers that

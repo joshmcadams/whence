@@ -30,6 +30,7 @@ func runDoctor() error {
 	tw := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
 	row := func(k, v string) { fmt.Fprintf(tw, "%s\t%s\n", k, v) }
 
+	row("whence version", version)
 	row("platform", fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH))
 	row("go version", runtime.Version())
 	row("config path", config.Path())

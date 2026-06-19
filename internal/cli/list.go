@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"bytes"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -93,16 +95,27 @@ func listOnce(cfg config.Config, o *listOpts) ([]model.Server, int, error) {
 }
 
 // watchList re-renders the table on an interval until interrupted (Ctrl-C).
+// Each frame is buffered then written line-by-line with an erase-to-end-of-line
+// escape (\033[K) so the terminal never flashes blank and trailing characters
+// from a wider previous frame don't bleed through.
 func watchList(cfg config.Config, o *listOpts) error {
 	for {
 		servers, hidden, err := listOnce(cfg, o)
 		if err != nil {
 			return err
 		}
-		fmt.Print("\033[H\033[2J") // home + clear screen
-		fmt.Printf("whence — %s (every %s, Ctrl-C to stop)\n\n",
+
+		var buf bytes.Buffer
+		fmt.Fprintf(&buf, "whence — %s (every %s, Ctrl-C to stop)\n\n",
 			time.Now().Format("15:04:05"), o.interval)
-		output.Table(os.Stdout, servers, hidden)
+		output.Table(&buf, servers, hidden)
+
+		fmt.Print("\033[H") // cursor home; no blank-screen clear
+		for _, line := range strings.Split(strings.TrimRight(buf.String(), "\n"), "\n") {
+			fmt.Print(line, "\033[K\n") // overwrite + erase any old tail on this line
+		}
+		fmt.Print("\033[J") // erase any leftover lines below the new content
+
 		time.Sleep(o.interval)
 	}
 }

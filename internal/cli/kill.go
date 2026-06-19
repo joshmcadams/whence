@@ -38,7 +38,7 @@ func newKillCmd() *cobra.Command {
 	}
 	f := cmd.Flags()
 	f.BoolVarP(&o.force, "force", "f", false, "skip the confirmation prompt")
-	f.BoolVar(&o.single, "single", false, "kill only the listening process, not its tree")
+	f.BoolVar(&o.single, "single", false, "kill only the listening process, not its launcher tree; for a name match with multiple targets each listener is killed individually")
 	f.DurationVarP(&o.timeout, "timeout", "t", 0, "grace period before force-kill (default from config)")
 	return cmd
 }
@@ -58,6 +58,14 @@ func runKill(target string, o *killOpts) error {
 		return fmt.Errorf("no server found matching %q", target)
 	}
 	units := dedupeUnits(matches)
+
+	// Warn when --single is paired with a multi-unit name match: each listener
+	// is killed by PID alone, leaving the rest of its process tree running.
+	if o.single && len(units) > 1 {
+		if port, err := strconv.Atoi(target); err != nil || port <= 0 {
+			fmt.Fprintf(os.Stderr, "note: --single with %d matched targets kills only each listener pid, not its tree\n", len(units))
+		}
+	}
 
 	timeout := o.timeout
 	if timeout <= 0 {

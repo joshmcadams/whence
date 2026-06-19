@@ -118,4 +118,9 @@ func TestJSON_LocksFieldContract(t *testing.T) {
 			t.Errorf("json missing %q in:\n%s", want, out)
 		}
 	}
+	// Human-readable uptime is added alongside uptimeNs; pin its key and value.
+	// 90s → HumanUptime drops the sub-minute remainder → "1m".
+	if !strings.Contains(out, `"uptime": "1m"`) {
+		t.Errorf("json missing human uptime field in:\n%s", out)
+	}
 }
