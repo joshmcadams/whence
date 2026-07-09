@@ -24,7 +24,7 @@ Repo ground rules that apply to EVERY plan (from `AGENTS.md`):
 | 003 | Sanitize untrusted strings at every terminal render boundary | P1 | S | — | DONE |
 | 004 | Recognize `.git` files (worktrees/submodules) in project root detection | P1 | S | — | DONE |
 | 005 | Scan row correctness: address-aware dedup, `*` exposure, extraction for tests | P1 | M | — | DONE |
-| 006 | Inventory merge correctness + docker JSON contract tests | P1 | M | — | TODO |
+| 006 | Inventory merge correctness + docker JSON contract tests | P1 | M | — | DONE |
 | 007 | Toolchain/CI cluster: go directive, pinned lint, gofmt enforcement, govulncheck | P1 | S | — | TODO |
 | 008 | Reconcile stale docs: backlog, DESIGN.md, README, phase comments, kill-climb caveat | P2 | S | 007 | TODO |
 | 009 | TUI refresh integrity: in-flight guard + snapshot generation counter | P2 | S | — | TODO |
@@ -165,6 +165,26 @@ in different packages and don't conflict. Everything touching `internal/tui/tui.
   collapsing to one under the old key) before restoring. Three uncached
   re-runs, full lint/test gate, both darwin+windows cross-compiles, and
   `git status` cleanliness all independently confirmed.
+
+- **006 — DONE.** Only unrelated drift (plan 005's net-zero-length line
+  change at `isAllInterfacesIP`), no reconciliation needed. Executed in
+  worktree branch `worktree-agent-ae5548a3f248ff424` (commit branch
+  `advisor/006-inventory-merge`), reviewed and approved 2026-07-09. Extracted
+  `inventory.merge()` with the address-aware suppression rule (docker-proxy
+  name, unattributed, or matching/all-interfaces exposure); `inspectAll` now
+  tolerates a partial `docker inspect` failure by parsing stdout before
+  checking the error; a new JSON fixture (`testdata/inspect.json`) finally
+  exercises the real `inspect` struct tags instead of hand-built structs.
+  This machine has a real compose stack running — reviewer independently
+  reproduced the STOP-condition live check (`whence list --all --json`
+  against the running `jfdid-db-1` container) and confirmed no docker-proxy
+  duplicate row leaked through. One benign, undocumented deviation caught in
+  review: `runningIDs` was also rerouted through the new `dockerOutput` seam
+  though scope said "only `inspectAll`" — verified zero production behavior
+  change (the seam defaults to the exact original function) and approved on
+  merit, but noting the executor should have flagged it. Three uncached
+  re-runs, full lint/test gate, and `git status` cleanliness all
+  independently confirmed.
 
 ## Findings considered and rejected (do not re-audit)
 
