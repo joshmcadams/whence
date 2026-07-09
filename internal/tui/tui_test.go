@@ -498,3 +498,62 @@ func TestConfirmPreviewBothDockerShortCircuits(t *testing.T) {
 		t.Error("docker confirm should not offer scope toggle")
 	}
 }
+
+func TestFooterHelp_ListMode(t *testing.T) {
+	m := newLoaded()
+	v := m.View()
+	for _, want := range []string{"move", "kill", "details", "filter", "all", "theme", "refresh", "quit"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("list-mode footer missing %q", want)
+		}
+	}
+}
+
+func TestFooterHelp_ConfirmMode(t *testing.T) {
+	m := newLoaded()
+	m.previewBoth = func(s pm.Server, _ kill.Opts) (kill.Plan, kill.Plan) {
+		return kill.Plan{Tree: []kill.TreeMember{{PID: 100, Name: "node"}}},
+			kill.Plan{Tree: []kill.TreeMember{{PID: 100, Name: "node"}}}
+	}
+	m = step(m, key("x"))
+	v := m.View()
+	if !strings.Contains(v, "confirm") {
+		t.Error("confirm footer missing 'confirm'")
+	}
+	if !strings.Contains(v, "toggle scope") {
+		t.Error("confirm footer missing 'toggle scope'")
+	}
+	if !strings.Contains(v, "cancel") {
+		t.Error("confirm footer missing 'cancel'")
+	}
+}
+
+func TestFooterHelp_ConfirmScopeAbsentForDocker(t *testing.T) {
+	m := newLoadedDocker()
+	m = step(m, key("x"))
+	v := m.View()
+	if strings.Contains(v, "toggle scope") {
+		t.Error("docker confirm must not show toggle scope")
+	}
+}
+
+func TestFooterHelp_DetailMode(t *testing.T) {
+	m := newLoaded()
+	m = step(m, key("enter"))
+	v := m.View()
+	if !strings.Contains(v, "back") {
+		t.Error("detail footer missing 'back'")
+	}
+}
+
+func TestFooterHelp_FilterMode(t *testing.T) {
+	m := newLoaded()
+	m = step(m, key("/"))
+	v := m.View()
+	if !strings.Contains(v, "apply") {
+		t.Error("filter footer missing 'apply'")
+	}
+	if !strings.Contains(v, "clear") {
+		t.Error("filter footer missing 'clear'")
+	}
+}

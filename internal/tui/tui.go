@@ -399,7 +399,7 @@ func (m Model) currentPlan() kill.Plan {
 
 func (m Model) View() string {
 	if m.mode == modeDetail {
-		return m.detailView()
+		return m.detailView() + m.footerView()
 	}
 
 	var b strings.Builder
@@ -437,8 +437,41 @@ func (m Model) headerView() string {
 	return title + meta
 }
 
+func (m Model) helpLine() string {
+	var parts []string
+	add := func(b bkey.Binding) {
+		parts = append(parts, b.Help().Key+" "+b.Help().Desc)
+	}
+
+	switch m.mode {
+	case modeList:
+		add(m.keys.Up)
+		add(m.keys.Kill)
+		add(m.keys.Detail)
+		add(m.keys.Filter)
+		add(m.keys.All)
+		add(m.keys.Theme)
+		add(m.keys.Refresh)
+		add(m.keys.Quit)
+	case modeConfirm:
+		add(m.keys.ConfirmYes)
+		plan := m.currentPlan()
+		if !plan.Docker && !plan.NoPID {
+			add(m.keys.ConfirmScope)
+		}
+		add(m.keys.ConfirmCancel)
+	case modeDetail:
+		add(m.keys.DetailBack)
+	case modeFilter:
+		add(m.keys.FilterApply)
+		add(m.keys.FilterCancel)
+	}
+
+	return dimStyle.Render(strings.Join(parts, " · "))
+}
+
 func (m Model) footerView() string {
-	help := dimStyle.Render("↑/↓ move · x kill · enter details · / filter · a all · t theme · r refresh · q/esc quit")
+	help := m.helpLine()
 	if m.status != "" {
 		return m.status + "\n" + help
 	}
@@ -482,7 +515,7 @@ func (m Model) confirmView() string {
 		if m.killSingle {
 			scope = "listener only"
 		}
-		b.WriteString(dimStyle.Render("scope: "+scope+" · s to toggle") + "\n")
+		b.WriteString(dimStyle.Render("scope: "+scope) + "\n")
 	}
 	b.WriteString("[y/N]")
 	return confirmBox.Render(b.String())
@@ -519,7 +552,6 @@ func (m Model) detailView() string {
 	}
 	b.WriteString("\n" + detailLabel.Render("Description") + "\n")
 	b.WriteString(wordWrap(output.Sanitize(s.Description()), 72) + "\n")
-	b.WriteString("\n" + dimStyle.Render("esc back · q list"))
 	return b.String()
 }
 
