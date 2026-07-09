@@ -25,7 +25,7 @@ Repo ground rules that apply to EVERY plan (from `AGENTS.md`):
 | 004 | Recognize `.git` files (worktrees/submodules) in project root detection | P1 | S | — | DONE |
 | 005 | Scan row correctness: address-aware dedup, `*` exposure, extraction for tests | P1 | M | — | DONE |
 | 006 | Inventory merge correctness + docker JSON contract tests | P1 | M | — | DONE |
-| 007 | Toolchain/CI cluster: go directive, pinned lint, gofmt enforcement, govulncheck | P1 | S | — | TODO |
+| 007 | Toolchain/CI cluster: go directive, pinned lint, gofmt enforcement, govulncheck | P1 | S | — | DONE |
 | 008 | Reconcile stale docs: backlog, DESIGN.md, README, phase comments, kill-climb caveat | P2 | S | 007 | TODO |
 | 009 | TUI refresh integrity: in-flight guard + snapshot generation counter | P2 | S | — | TODO |
 | 010 | Harden attribution inputs: bounded file reads, compose workdir validation, `--` separators | P2 | S | — | TODO |
@@ -185,6 +185,26 @@ in different packages and don't conflict. Everything touching `internal/tui/tui.
   merit, but noting the executor should have flagged it. Three uncached
   re-runs, full lint/test gate, and `git status` cleanliness all
   independently confirmed.
+
+- **007 — DONE.** No drift, no reconciliation needed. Executed in worktree
+  branch `worktree-agent-af9279572b9159f41` (commit branch
+  `advisor/007-toolchain-ci`), reviewed and approved 2026-07-09. Lowered
+  `go.mod`'s directive to `1.25` (build+test pass clean; reviewer confirmed
+  independently the only sub-1.25 construct in the codebase is the one
+  `max()` call already accounted for) — this removes the need for CI's
+  `install-mode: goinstall` golangci-lint workaround, which is now reverted
+  to the standard binary install. All four CI jobs (including the new
+  `vulncheck`) pin `go-version-file: go.mod`. `.golangci.yml` now enforces
+  gofmt via `formatters:`. `Makefile` pins and surfaces the golangci-lint
+  version. AGENTS.md/README.md updated to match. Reviewer independently
+  parsed the final `ci.yml` with a real YAML parser (not just visual
+  inspection) and independently re-ran `govulncheck` — reproduced the exact
+  result reported: 0 vulnerabilities in code the project actually calls, 4
+  in imported-but-uncalled packages, 17 in required-but-uncalled modules
+  (advisory-only, correctly not remediated in this plan). Local `make lint`
+  validated against an already-installed golangci-lint v2.11.4 rather than
+  the newly-pinned v2.12.2 (none newer was on this box) — config syntax is
+  proven valid; CI's action will fetch the actual pinned version.
 
 ## Findings considered and rejected (do not re-audit)
 
