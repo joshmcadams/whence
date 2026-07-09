@@ -8,6 +8,7 @@
 package kill
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -26,6 +27,7 @@ var (
 	forceKillPID         = forceKill
 	pidAlive             = isAlive
 	dockerCombinedOutput = execx.CombinedOutput
+	processCreateTime    = createTime
 )
 
 // Opts controls kill behavior.
@@ -157,18 +159,22 @@ func Server(s model.Server, o Opts) Result {
 	if s.PID <= 0 {
 		return Result{Server: s, Err: errors.New("no accessible pid (owned by another user; try elevated privileges)")}
 	}
-	method, err := killProcess(s.PID, o)
+	method, err := killProcess(s, o)
 	return Result{Server: s, Killed: err == nil, Method: method, Err: err}
 }
 
-func killProcess(pid int, o Opts) (string, error) {
-	tbl := takeSnapshot()
-
+func killProcess(s model.Server, o Opts) (string, error) {
 	method := "tree"
 	if o.Single {
 		method = "single"
 	}
-	tree := planTree(pid, o.Single, tbl)
+
+	if err := verifyIdentity(s.PID, s.StartTime); err != nil {
+		return method, err
+	}
+
+	tbl := takeSnapshot()
+	tree := planTree(s.PID, o.Single, tbl)
 
 	for _, p := range tree {
 		_ = terminatePID(p) // best effort; some may already be gone
@@ -312,6 +318,44 @@ func allDead(pids []int) bool {
 		}
 	}
 	return true
+}
+
+// createTime returns the OS-reported start time of pid. It is the production
+// implementation of the processCreateTime seam.
+func createTime(pid int) (time.Time, error) {
+	p, err := process.NewProcess(int32(pid))
+	if err != nil {
+		return time.Time{}, err
+	}
+	ms, err := p.CreateTimeWithContext(context.Background())
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.UnixMilli(ms), nil
+}
+
+// verifyIdentity reports whether pid still refers to the process scanned
+// earlier, by comparing OS-reported create times within a small epsilon
+// (create-time granularity differs per OS: Linux jiffies vs Windows FILETIME).
+// Best-effort: an unreadable create time only matters — and only refuses the
+// kill — when the scan had a start time to compare against; scanned.IsZero()
+// means there is nothing to check (e.g. some docker-attributed rows), so the
+// kill proceeds. A mismatch means the pid was recycled by the OS between the
+// scan and the kill, most likely because the original process already exited
+// while the user was reading the confirmation prompt.
+func verifyIdentity(pid int, scanned time.Time) error {
+	if scanned.IsZero() {
+		return nil
+	}
+	now, err := processCreateTime(pid)
+	if err != nil {
+		return fmt.Errorf("target changed since scan (pid %d no longer readable): %w — rescan and retry", pid, err)
+	}
+	const epsilon = 2 * time.Second
+	if d := now.Sub(scanned); d > epsilon || d < -epsilon {
+		return fmt.Errorf("target changed since scan (pid %d was reused by another process) — rescan and retry", pid)
+	}
+	return nil
 }
 
 // isAlive reports whether pid is a live process, treating zombies as dead: a
