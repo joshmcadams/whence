@@ -3,7 +3,9 @@ package kill
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"reflect"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -517,6 +519,23 @@ func TestIsAlive(t *testing.T) {
 	if isAlive(999999999) {
 		t.Error("isAlive(implausibly large pid) = true, want false")
 	}
+}
+
+func TestIsAliveZombie(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("zombie processes are a POSIX concept; Windows has no equivalent")
+	}
+	cmd := exec.Command("sleep", "0.01")
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("failed to start child process: %v", err)
+	}
+	// Give the child time to exit without being reaped (no cmd.Wait() yet),
+	// leaving it a zombie.
+	time.Sleep(200 * time.Millisecond)
+	if isAlive(cmd.Process.Pid) {
+		t.Error("isAlive(zombie pid) = true, want false")
+	}
+	_ = cmd.Wait() // reap the child so it doesn't linger
 }
 
 func TestSnapshot_IncludesCurrentProcess(t *testing.T) {

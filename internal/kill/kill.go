@@ -314,7 +314,27 @@ func allDead(pids []int) bool {
 	return true
 }
 
+// isAlive reports whether pid is a live process, treating zombies as dead: a
+// killed process whose parent hasn't reaped it still has a /proc entry (so
+// PidExists is true) but is defunct, and waiting for it to disappear would
+// burn the full grace period before falsely reporting a survivor. On
+// platforms where Status() isn't implemented (Windows), the err == nil guard
+// below means behavior is unchanged (PidExists only).
 func isAlive(pid int) bool {
 	ok, err := process.PidExists(int32(pid))
-	return err == nil && ok
+	if err != nil || !ok {
+		return false
+	}
+	p, err := process.NewProcess(int32(pid))
+	if err != nil {
+		return false
+	}
+	if statuses, err := p.Status(); err == nil {
+		for _, st := range statuses {
+			if st == process.Zombie {
+				return false
+			}
+		}
+	}
+	return true
 }
