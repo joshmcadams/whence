@@ -61,6 +61,7 @@ scoop install whence
 
 ```sh
 whence                      # list your dev servers (alias for `whence list`)
+whence list api             # only servers matching "api" (name, description, or port)
 whence list --all           # include every listening port
 whence list --json          # machine-readable output
 whence list --port 3000     # only this port
@@ -70,6 +71,7 @@ whence list --watch --interval 5s   # change the --watch refresh interval (defau
 whence list --no-ignore     # bypass ignore_ports / ignore_names
 
 whence kill 3000            # kill the server on a port
+whence kill 3000 5173       # kill several at once
 whence kill myapp           # kill every server in a project (exact name preferred)
 whence kill 3000 --force    # skip the confirmation prompt
 whence kill 3000 --single   # kill only the listening process, not its tree
@@ -93,6 +95,7 @@ whence config --init        # write a default config file
 | `/` | filter |
 | `a` | toggle all / yours |
 | `t` | cycle color theme (saved to config) |
+| `s` | cycle sort: port → uptime → name |
 | `r` | refresh now |
 | `q` | quit |
 

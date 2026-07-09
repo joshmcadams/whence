@@ -33,11 +33,11 @@ Repo ground rules that apply to EVERY plan (from `AGENTS.md`):
 | 012 | Stable sorts and `--watch` input validation | P2 | S | — | DONE |
 | 013 | Remaining test seams: TUI preview, classify orchestration, CLI layer | P2 | M | 001 | DONE |
 | 014 | Single source of truth for row rendering and server descriptions (CLI + TUI) | P2 | M | 003 | DONE |
-| 015 | Cleanup sweep: dead code, config.Path build tags, error idioms | P3 | S | 013 | TODO (refreshed 2026-07-09 @ 81670c7 — line numbers updated) |
+| 015 | Cleanup sweep: dead code, config.Path build tags, error idioms | P3 | S | 013 | DONE |
 | 016 | Consolidate the three name-matching implementations | P3 | M | — | TODO (excerpts drifted; reconcilable) |
 | 017 | TUI keymap: bindings and help text from one definition | P3 | M | 009, 013, 014 | DONE |
 | 018 | macOS scan robustness: socket-enumeration timeout, batched lsof, testable parser | P2 | M | 005 | DONE |
-| 019 | Expose built-but-hidden surfaces: detail-view tree, list query, TUI sort, multi-target kill | P2 | M | 013 | TODO (excerpts drifted; reconcilable) |
+| 019 | Expose built-but-hidden surfaces: detail-view tree, list query, TUI sort, multi-target kill | P2 | M | 013, 017 | TODO (refreshed 2026-07-09 @ 65bc564 — line numbers + keymap excerpt) |
 | 020 | `whence config --edit` | P3 | S | — | TODO (excerpts drifted; reconcilable) |
 | 021 | Podman fallback for the container detection path | P3 | M | 006, 010 | TODO (minor drift in kill.go; reconcilable) |
 | 022 | Migrate the TUI stack to charmbracelet v2 | P3 | M | 009, 013, 014, 017, 019 | BLOCKED (depends on 014, 017, 019) |
