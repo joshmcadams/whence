@@ -1,7 +1,9 @@
 package inventory
 
 import (
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/joshmcadams/whence/internal/config"
 	"github.com/joshmcadams/whence/internal/model"
@@ -148,4 +150,87 @@ func TestView_IgnoreNames(t *testing.T) {
 	if got := View(servers(), cfg2, true, 0, ""); len(got) != 1 || got[0].Name != "sshd" {
 		t.Fatalf("ignoring 'jfdid' should leave only sshd, got %v", got)
 	}
+}
+
+// key returns a tuple that uniquely identifies a server regardless of Sort's
+// tiebreak chain, for asserting the two permutations below settled on the
+// same row order (not just the same membership).
+func key(s model.Server) [5]string {
+	return [5]string{
+		strconv.Itoa(s.Port), s.Proto, s.Address, strconv.Itoa(s.PID), s.Name,
+	}
+}
+
+func keys(servers []model.Server) []([5]string) {
+	out := make([][5]string, len(servers))
+	for i, s := range servers {
+		out[i] = key(s)
+	}
+	return out
+}
+
+// assertSameOrder fails unless two permutation runs of Sort produced the
+// byte-identical row order.
+func assertSameOrder(t *testing.T, by string, a, b []model.Server) {
+	t.Helper()
+	Sort(a, by)
+	Sort(b, by)
+	ka, kb := keys(a), keys(b)
+	if len(ka) != len(kb) {
+		t.Fatalf("Sort(%q): length mismatch %d vs %d", by, len(ka), len(kb))
+	}
+	for i := range ka {
+		if ka[i] != kb[i] {
+			t.Fatalf("Sort(%q) not permutation-stable at row %d: %v vs %v", by, i, ka, kb)
+		}
+	}
+}
+
+func TestSort_PortIsPermutationStable(t *testing.T) {
+	// Two rows tie on port+proto+address+pid; only Name differs, so the full
+	// defaultLess chain must be exercised to land on one deterministic order.
+	orderA := []model.Server{
+		{Port: 8080, Proto: "tcp", Address: "127.0.0.1", PID: 100, Name: "beta"},
+		{Port: 8080, Proto: "tcp", Address: "127.0.0.1", PID: 100, Name: "alpha"},
+		{Port: 3000, Proto: "tcp", Address: "0.0.0.0", PID: 1, Name: "z"},
+	}
+	orderB := []model.Server{
+		{Port: 3000, Proto: "tcp", Address: "0.0.0.0", PID: 1, Name: "z"},
+		{Port: 8080, Proto: "tcp", Address: "127.0.0.1", PID: 100, Name: "alpha"},
+		{Port: 8080, Proto: "tcp", Address: "127.0.0.1", PID: 100, Name: "beta"},
+	}
+	assertSameOrder(t, "port", orderA, orderB)
+}
+
+func TestSort_UptimeIsPermutationStable(t *testing.T) {
+	// Two rows share Uptime == 0 (the common "unknown uptime" case); the tie
+	// must resolve via defaultLess, not input order.
+	tie := 5 * time.Minute
+	orderA := []model.Server{
+		{Port: 9000, Uptime: 0, Name: "b"},
+		{Port: 9000, Uptime: 0, Name: "a"},
+		{Port: 4000, Uptime: tie, Name: "solo"},
+	}
+	orderB := []model.Server{
+		{Port: 4000, Uptime: tie, Name: "solo"},
+		{Port: 9000, Uptime: 0, Name: "a"},
+		{Port: 9000, Uptime: 0, Name: "b"},
+	}
+	assertSameOrder(t, "uptime", orderA, orderB)
+}
+
+func TestSort_NameIsPermutationStable(t *testing.T) {
+	// Two unattributed rows share an empty DisplayName; the tie must resolve
+	// via defaultLess (port here), not input order.
+	orderA := []model.Server{
+		{Port: 9000, Name: ""},
+		{Port: 4000, Name: ""},
+		{Port: 1000, Project: &model.Project{Name: "zeta"}},
+	}
+	orderB := []model.Server{
+		{Port: 1000, Project: &model.Project{Name: "zeta"}},
+		{Port: 4000, Name: ""},
+		{Port: 9000, Name: ""},
+	}
+	assertSameOrder(t, "name", orderA, orderB)
 }

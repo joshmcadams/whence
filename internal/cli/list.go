@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -57,7 +58,13 @@ func runListWith(o *listOpts) error {
 		return err
 	}
 
-	if o.watch && !o.asJSON {
+	if o.watch {
+		if o.asJSON {
+			return errors.New("--watch cannot be combined with --json")
+		}
+		if o.interval < 500*time.Millisecond {
+			return fmt.Errorf("--interval must be at least 500ms (got %s)", o.interval)
+		}
 		return watchList(cfg, o)
 	}
 

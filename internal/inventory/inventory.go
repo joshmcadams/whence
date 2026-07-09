@@ -159,18 +159,44 @@ func matchesQuery(s model.Server, q string) bool {
 }
 
 // Sort orders servers in place by the given key: port (default), uptime, name.
+// Every key falls through to defaultLess on ties, so equal-key rows have one
+// deterministic order regardless of input permutation — required for --watch
+// and TUI refreshes not to shuffle tied rows between frames.
 func Sort(s []model.Server, by string) {
+	less := func(i, j int) bool { return defaultLess(s[i], s[j]) }
 	switch by {
 	case "uptime":
-		sort.Slice(s, func(i, j int) bool { return s[i].Uptime > s[j].Uptime })
-	case "name":
-		sort.Slice(s, func(i, j int) bool { return s[i].DisplayName() < s[j].DisplayName() })
-	default:
-		sort.Slice(s, func(i, j int) bool {
-			if s[i].Port != s[j].Port {
-				return s[i].Port < s[j].Port
+		less = func(i, j int) bool {
+			if s[i].Uptime != s[j].Uptime {
+				return s[i].Uptime > s[j].Uptime
 			}
-			return s[i].Proto < s[j].Proto
-		})
+			return defaultLess(s[i], s[j])
+		}
+	case "name":
+		less = func(i, j int) bool {
+			a, b := s[i].DisplayName(), s[j].DisplayName()
+			if a != b {
+				return a < b
+			}
+			return defaultLess(s[i], s[j])
+		}
 	}
+	sort.SliceStable(s, less)
+}
+
+// defaultLess is the port-order tiebreak chain: port, proto, address, pid, name.
+func defaultLess(a, b model.Server) bool {
+	if a.Port != b.Port {
+		return a.Port < b.Port
+	}
+	if a.Proto != b.Proto {
+		return a.Proto < b.Proto
+	}
+	if a.Address != b.Address {
+		return a.Address < b.Address
+	}
+	if a.PID != b.PID {
+		return a.PID < b.PID
+	}
+	return a.Name < b.Name
 }
