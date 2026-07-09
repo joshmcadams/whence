@@ -46,6 +46,47 @@ func TestDetect_GitRootCollapsesMonorepoSubdir(t *testing.T) {
 	}
 }
 
+func TestDetect_GitFileWorktreeResolvesToWorktreeRoot(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, ".git"), "gitdir: /somewhere/else\n")
+	writeFile(t, filepath.Join(root, "web", "package.json"), `{"name":"web"}`)
+
+	got := Detect(filepath.Join(root, "web"))
+	if got == nil {
+		t.Fatal("expected a project, got nil")
+	}
+	if got.Root != root {
+		t.Errorf("root = %q, want %q", got.Root, root)
+	}
+	if got.Marker != ".git" {
+		t.Errorf("marker = %q, want .git", got.Marker)
+	}
+}
+
+func TestDetect_GitFileWorktreeDoesNotOverWalkToEnclosingRepo(t *testing.T) {
+	outer := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(outer, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	wt := filepath.Join(outer, "wt")
+	writeFile(t, filepath.Join(wt, ".git"), "gitdir: /somewhere/else\n")
+	src := filepath.Join(wt, "src")
+	if err := os.MkdirAll(src, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	got := Detect(src)
+	if got == nil {
+		t.Fatal("expected a project, got nil")
+	}
+	if got.Root != wt {
+		t.Errorf("root = %q, want %q (nearest marker, not enclosing repo %q)", got.Root, wt, outer)
+	}
+	if got.Marker != ".git" {
+		t.Errorf("marker = %q, want .git", got.Marker)
+	}
+}
+
 func TestDetect_ManifestFallbackWhenNoGit(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "go.mod"), "module github.com/me/widget\n\ngo 1.26\n")
