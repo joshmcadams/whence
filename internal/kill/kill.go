@@ -19,6 +19,15 @@ import (
 	"github.com/joshmcadams/whence/internal/model"
 )
 
+// Test seams: production code always uses these vars, tests swap them.
+var (
+	takeSnapshot         = snapshot
+	terminatePID         = terminate
+	forceKillPID         = forceKill
+	pidAlive             = isAlive
+	dockerCombinedOutput = execx.CombinedOutput
+)
+
 // Opts controls kill behavior.
 type Opts struct {
 	Timeout time.Duration // grace period before SIGKILL / docker stop -t
@@ -61,13 +70,13 @@ func Preview(s model.Server, o Opts) Plan {
 	if s.PID <= 0 {
 		return Plan{Server: s, NoPID: true}
 	}
-	return previewWith(s, o, snapshot())
+	return previewWith(s, o, takeSnapshot())
 }
 
 // PreviewBatch computes Plans for multiple servers with a single process-table
 // snapshot, avoiding the N-snapshot cost when previewing a multi-port kill.
 func PreviewBatch(servers []model.Server, o Opts) []Plan {
-	tbl := snapshot()
+	tbl := takeSnapshot()
 	plans := make([]Plan, len(servers))
 	for i, s := range servers {
 		if s.Source == model.SourceDocker {
@@ -153,7 +162,7 @@ func Server(s model.Server, o Opts) Result {
 }
 
 func killProcess(pid int, o Opts) (string, error) {
-	tbl := snapshot()
+	tbl := takeSnapshot()
 
 	method := "tree"
 	if o.Single {
@@ -162,7 +171,7 @@ func killProcess(pid int, o Opts) (string, error) {
 	tree := planTree(pid, o.Single, tbl)
 
 	for _, p := range tree {
-		_ = terminate(p) // best effort; some may already be gone
+		_ = terminatePID(p) // best effort; some may already be gone
 	}
 
 	timeout := o.Timeout
@@ -179,8 +188,8 @@ func killProcess(pid int, o Opts) (string, error) {
 
 	var lastErr error
 	for _, p := range tree {
-		if isAlive(p) {
-			if err := forceKill(p); err != nil {
+		if pidAlive(p) {
+			if err := forceKillPID(p); err != nil {
 				lastErr = err
 			}
 		}
@@ -205,7 +214,7 @@ func dockerStop(s model.Server, o Opts) Result {
 	// `docker stop` waits up to `secs` for a graceful stop; bound the CLI call
 	// itself beyond that so a wedged daemon can't hang the kill forever.
 	timeout := time.Duration(secs)*time.Second + 10*time.Second
-	if out, err := execx.CombinedOutput(timeout, "docker", "stop", "-t", strconv.Itoa(secs), s.Name); err != nil {
+	if out, err := dockerCombinedOutput(timeout, "docker", "stop", "-t", strconv.Itoa(secs), s.Name); err != nil {
 		return Result{Server: s, Method: "docker stop", Err: fmt.Errorf("%v: %s", err, out)}
 	}
 	return Result{Server: s, Killed: true, Method: "docker stop"}
@@ -284,7 +293,7 @@ func subtree(root int, t procTable) []int {
 
 func allDead(pids []int) bool {
 	for _, p := range pids {
-		if isAlive(p) {
+		if pidAlive(p) {
 			return false
 		}
 	}
