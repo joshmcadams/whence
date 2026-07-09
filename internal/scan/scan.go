@@ -96,7 +96,7 @@ func rowsFromConns(conns []gnet.ConnectionStat, now time.Time,
 		if c.Pid > 0 {
 			enrichFn(&s, c.Pid, now)
 		} else {
-			s.Notes = append(s.Notes, "no pid (owned by another user; rerun with elevated privileges)")
+			s.Notes = append(s.Notes, "no pid (owned by another user; try elevated privileges)")
 		}
 		servers = append(servers, s)
 	}

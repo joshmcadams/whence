@@ -121,7 +121,7 @@ func TestRowsFromConns_NoPIDGetsNoteAndSkipsEnrich(t *testing.T) {
 	}
 	found := false
 	for _, n := range got[0].Notes {
-		if n == "no pid (owned by another user; rerun with elevated privileges)" {
+		if n == "no pid (owned by another user; try elevated privileges)" {
 			found = true
 		}
 	}

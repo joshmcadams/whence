@@ -15,7 +15,7 @@ func processCwd(pid int32) (string, error) {
 	cwd, err := os.Readlink(link)
 	if err != nil {
 		if os.IsPermission(err) {
-			return "", fmt.Errorf("permission denied")
+			return "", fmt.Errorf("permission denied: %w", err)
 		}
 		return "", err
 	}

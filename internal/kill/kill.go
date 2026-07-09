@@ -134,7 +134,7 @@ func (p Plan) Lines() []string {
 	case p.Docker:
 		return []string{"docker stop"}
 	case p.NoPID:
-		return []string{"no accessible pid (owned by another user; try elevated privileges)"}
+		return []string{errNoPID.Error()}
 	default:
 		lines := make([]string, len(p.Tree))
 		for i, m := range p.Tree {
@@ -152,7 +152,8 @@ func (p Plan) Lines() []string {
 	}
 }
 
-// launchers are wrapper processes we will climb through to find the tree head.
+// errNoPID is returned when a native server has no accessible pid.
+var errNoPID = errors.New("no accessible pid (owned by another user; try elevated privileges)")
 // Shells (bash/zsh/sh/fish/pwsh/cmd) are deliberately absent: climbing stops at
 // them so an interactive session is never killed.
 //
@@ -178,7 +179,7 @@ func Server(s model.Server, o Opts) Result {
 		return dockerStop(s, o)
 	}
 	if s.PID <= 0 {
-		return Result{Server: s, Err: errors.New("no accessible pid (owned by another user; try elevated privileges)")}
+		return Result{Server: s, Err: errNoPID}
 	}
 	method, err := killProcess(s, o)
 	return Result{Server: s, Killed: err == nil, Method: method, Err: err}
@@ -242,7 +243,7 @@ func dockerStop(s model.Server, o Opts) Result {
 	// itself beyond that so a wedged daemon can't hang the kill forever.
 	timeout := time.Duration(secs)*time.Second + 10*time.Second
 	if out, err := dockerCombinedOutput(timeout, "docker", "stop", "-t", strconv.Itoa(secs), "--", s.Name); err != nil {
-		return Result{Server: s, Method: "docker stop", Err: fmt.Errorf("%v: %s", err, out)}
+		return Result{Server: s, Method: "docker stop", Err: fmt.Errorf("%w: %s", err, out)}
 	}
 	return Result{Server: s, Killed: true, Method: "docker stop"}
 }
