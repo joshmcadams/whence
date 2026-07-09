@@ -117,12 +117,14 @@ nothing below `inventory` should import `cli`, `tui`, or `inventory`.
   (system Postgres, docker-proxy, k3s) show no PID and appear unattributed under
   `--all`. This is expected, surfaced in `doctor`, and noted on the row.
 - **`kill <port>` can terminate more than the named port.** Because the kill
-  climbs to a launcher and takes the whole subtree, a shared launcher (one
-  `make dev` / `npm` script that starts several services) means killing one
+  climbs to a launcher and takes the whole subtree, a shared launcher (e.g. one
+  `make dev` recipe that starts several services directly) means killing one
   port stops its siblings too. By design — and the confirmation prompt now
   enumerates the full tree (climbed root + descendants, with a process count) so
   you see every process before agreeing. The preview and the kill share
-  `kill.planTree`, so they can't disagree (see `internal/kill/AGENTS.md`).
+  `kill.planTree`, so they can't disagree (see `internal/kill/AGENTS.md`, which
+  also covers the npm/yarn/pnpm case — the climb usually stops at the shell
+  those wrappers interpose, not at the wrapper itself).
 - **Dual-stack servers (bound to both IPv4 and IPv6) collapse to one row.**
   `scan.collapseIPv4IPv6` merges `(port, pid)` pairs where both stacks share
   the same exposure class — `0.0.0.0`+`::` → `tcp`/`0.0.0.0`; `127.0.0.1`+`::1`

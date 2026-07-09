@@ -1,6 +1,6 @@
 # imp-07 — Surface bind address / network exposure
 
-**Status:** todo
+**Status:** done (see commit 0a591c2)
 **Priority:** medium — useful signal from data already collected; mild security value
 **Category:** UX / feature
 **Effort:** ~45 min

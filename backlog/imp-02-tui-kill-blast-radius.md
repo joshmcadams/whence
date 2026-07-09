@@ -1,6 +1,6 @@
 # imp-02 — Show the full kill blast radius in the TUI confirmation
 
-**Status:** done (branch `improvements`)
+**Status:** done (merged to main)
 **Priority:** high — safety; the TUI can kill more than it shows
 **Category:** UX / safety
 **Effort:** ~1 hr

@@ -1,5 +1,5 @@
 // Package model holds the core data types shared across the scanner, the CLI,
-// and (later) the TUI.
+// and the TUI.
 package model
 
 import "time"
@@ -9,7 +9,7 @@ type Source string
 
 const (
 	SourceProcess Source = "process" // a native host process holds the socket
-	SourceDocker  Source = "docker"  // a container publishes the port (Phase 2)
+	SourceDocker  Source = "docker"  // a container publishes the port, attached by the docker detection path
 )
 
 // Server is a single listening port and everything we could learn about the
@@ -54,7 +54,7 @@ func (s Server) Description() string {
 	return ""
 }
 
-// Project is the repo a Server was launched from (populated in Phase 2).
+// Project is the repo a Server was launched from, attached by classify.Process.
 type Project struct {
 	Name        string `json:"name"`
 	Root        string `json:"root"`

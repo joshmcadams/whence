@@ -16,9 +16,20 @@ the tree head, then `subtree` kills that head and all descendants. The climb
 
 So an interactive session is never a kill target. If you edit `launchers`, keep
 shells out, and keep **bare `node` out** — including it lets a kill climb into a
-long-lived node host (e.g. an editor's extension host). The npm/yarn/pnpm chain
-is still handled: we climb through those wrappers and any `node` helper dies as a
-*descendant* of the subtree, never as a climb target. There are tests
+long-lived node host (e.g. an editor's extension host).
+
+In practice `npm run <script>` / `yarn` / `pnpm` execute the script body via an
+interposed `sh -c` (`npm → sh → node`), and many `make` recipes do the same for
+any line with shell metacharacters. Since shells are deliberately not
+launchers, `climb` stops at that `sh` and never reaches `npm`/`make` above it —
+the listening `node` (or its immediate non-shell parent) is the head of the
+kill, and the wrapper above the shell is untouched. `npm`/`yarn`/`pnpm`/`make`
+are still in the `launchers` list for the other case: a wrapper that execs the
+server **directly**, with no intervening shell (e.g. `npm exec <bin>` on some
+platforms, or a `make` recipe with a single non-shell command) — there, climb
+does walk up into the wrapper as designed. Either way the confirmation preview
+computes the same tree the kill will act on (see below), so what you see is
+what dies — never guess from this paragraph alone. There are tests
 (`kill_test.go`) for `climb`/`subtree`; extend them when you touch the list.
 
 ## Invariant 2 — graceful then forced

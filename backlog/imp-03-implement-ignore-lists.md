@@ -1,6 +1,6 @@
 # imp-03 — Implement (or remove) `ignore_ports` / `ignore_names`
 
-**Status:** done (branch `improvements`)
+**Status:** done (merged to main)
 **Priority:** high — a documented, configurable feature that silently does nothing
 **Category:** correctness / trust
 **Effort:** ~30 min to implement; ~5 min to remove
