@@ -1,6 +1,6 @@
 package tui
 
-import bkey "github.com/charmbracelet/bubbles/key"
+import bkey "charm.land/bubbles/v2/key"
 
 type keyMap struct {
 	Up, Down             bkey.Binding

@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	bkey "github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	bkey "charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/table"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/joshmcadams/whence/internal/config"
 	"github.com/joshmcadams/whence/internal/inventory"
@@ -249,7 +249,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
 
@@ -257,7 +257,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m.forward(msg)
 }
 
-func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if msg.String() == "ctrl+c" {
 		return m, tea.Quit
 	}
@@ -417,9 +417,11 @@ func (m Model) currentPlan() kill.Plan {
 
 // --- view -------------------------------------------------------------------
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	if m.mode == modeDetail {
-		return m.detailView() + m.footerView()
+		v := tea.NewView(m.detailView() + m.footerView())
+		v.AltScreen = true
+		return v
 	}
 
 	var b strings.Builder
@@ -438,7 +440,9 @@ func (m Model) View() string {
 	}
 
 	b.WriteString(m.footerView())
-	return b.String()
+	v := tea.NewView(b.String())
+	v.AltScreen = true
+	return v
 }
 
 func (m Model) headerView() string {

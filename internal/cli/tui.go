@@ -1,7 +1,7 @@
 package cli
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/cobra"
 
 	"github.com/joshmcadams/whence/internal/config"
@@ -19,7 +19,7 @@ func newTUICmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			p := tea.NewProgram(tui.New(cfg, all), tea.WithAltScreen())
+			p := tea.NewProgram(tui.New(cfg, all))
 			_, err = p.Run()
 			return err
 		},

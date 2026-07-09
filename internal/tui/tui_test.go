@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/joshmcadams/whence/internal/config"
 	"github.com/joshmcadams/whence/internal/kill"
@@ -51,14 +51,14 @@ func step(m Model, msg tea.Msg) Model {
 	return nm.(Model)
 }
 
-func key(s string) tea.KeyMsg {
+func key(s string) tea.KeyPressMsg {
 	switch s {
 	case "enter":
-		return tea.KeyMsg{Type: tea.KeyEnter}
+		return tea.KeyPressMsg{Code: tea.KeyEnter}
 	case "esc":
-		return tea.KeyMsg{Type: tea.KeyEsc}
+		return tea.KeyPressMsg{Code: tea.KeyEsc}
 	default:
-		return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
+		return tea.KeyPressMsg{Code: []rune(s)[0], Text: s}
 	}
 }
 
@@ -129,7 +129,7 @@ func TestConfirmPreviewsBlastRadius(t *testing.T) {
 	if !found {
 		t.Errorf("selected listener pid 100 not in previewed tree %+v", m.planTree.Tree)
 	}
-	if !strings.Contains(m.View(), "100") {
+	if !strings.Contains(m.View().Content, "100") {
 		t.Error("confirm view does not render the pid; blast radius not shown to the user")
 	}
 }
@@ -182,7 +182,7 @@ func TestDetailViewShowsBind(t *testing.T) {
 	if m.mode != modeDetail {
 		t.Fatalf("mode = %v, want modeDetail", m.mode)
 	}
-	v := m.View()
+	v := m.View().Content
 	if !strings.Contains(v, "Bind") {
 		t.Errorf("detail view missing Bind field:\n%s", v)
 	}
@@ -204,7 +204,7 @@ func TestEmptyViewShowsHint(t *testing.T) {
 	if len(m.raw) == 0 {
 		t.Fatal("raw should be non-empty")
 	}
-	v := m.View()
+	v := m.View().Content
 	if !strings.Contains(v, "press a") {
 		t.Errorf("hint absent from view:\n%s", v)
 	}
@@ -217,7 +217,7 @@ func TestHintAbsentWhenAll(t *testing.T) {
 	m = step(m, loadedMsg{servers: []pm.Server{
 		{Port: 9999, Proto: "tcp", Source: pm.SourceProcess, Confidence: 0},
 	}})
-	v := m.View()
+	v := m.View().Content
 	if strings.Contains(v, "press a to show all") {
 		t.Errorf("hint must not appear when all=true:\n%s", v)
 	}
@@ -236,7 +236,7 @@ func TestHintAbsentWhenQueryFilters(t *testing.T) {
 	if m.query == "" {
 		t.Fatal("query should be set")
 	}
-	v := m.View()
+	v := m.View().Content
 	if strings.Contains(v, "press a to show all") {
 		t.Errorf("hint must not appear when query is active:\n%s", v)
 	}
@@ -448,7 +448,7 @@ func TestConfirmUsesPreviewBothSeam(t *testing.T) {
 	}
 
 	// Toggle scope with 's' — must re-render without calling previewBoth again.
-	beforeView := m.View()
+	beforeView := m.View().Content
 	m = step(m, key("s"))
 	if !m.killSingle {
 		t.Error("killSingle should be true after 's' toggle")
@@ -456,7 +456,7 @@ func TestConfirmUsesPreviewBothSeam(t *testing.T) {
 	if calls != 1 {
 		t.Errorf("previewBoth called %d times after toggle, want still 1 (no re-snapshot)", calls)
 	}
-	afterView := m.View()
+	afterView := m.View().Content
 	// Whole-tree view must contain all three PIDs; single-tree only the listener.
 	if !strings.Contains(beforeView, "1") || !strings.Contains(beforeView, "2") || !strings.Contains(beforeView, "3") {
 		t.Errorf("whole-tree view should show all pids:\n%s", beforeView)
@@ -493,7 +493,7 @@ func TestConfirmPreviewBothDockerShortCircuits(t *testing.T) {
 
 	// Scoping is not togglable for docker, so planTree == planSingle
 	// and confirmView should not show the scope toggle.
-	v := m.View()
+	v := m.View().Content
 	if strings.Contains(v, "s to toggle") {
 		t.Error("docker confirm should not offer scope toggle")
 	}
@@ -501,7 +501,7 @@ func TestConfirmPreviewBothDockerShortCircuits(t *testing.T) {
 
 func TestFooterHelp_ListMode(t *testing.T) {
 	m := newLoaded()
-	v := m.View()
+	v := m.View().Content
 	for _, want := range []string{"move", "kill", "details", "filter", "all", "theme", "refresh", "quit"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("list-mode footer missing %q", want)
@@ -516,7 +516,7 @@ func TestFooterHelp_ConfirmMode(t *testing.T) {
 			kill.Plan{Tree: []kill.TreeMember{{PID: 100, Name: "node"}}}
 	}
 	m = step(m, key("x"))
-	v := m.View()
+	v := m.View().Content
 	if !strings.Contains(v, "confirm") {
 		t.Error("confirm footer missing 'confirm'")
 	}
@@ -531,7 +531,7 @@ func TestFooterHelp_ConfirmMode(t *testing.T) {
 func TestFooterHelp_ConfirmScopeAbsentForDocker(t *testing.T) {
 	m := newLoadedDocker()
 	m = step(m, key("x"))
-	v := m.View()
+	v := m.View().Content
 	if strings.Contains(v, "toggle scope") {
 		t.Error("docker confirm must not show toggle scope")
 	}
@@ -540,7 +540,7 @@ func TestFooterHelp_ConfirmScopeAbsentForDocker(t *testing.T) {
 func TestFooterHelp_DetailMode(t *testing.T) {
 	m := newLoaded()
 	m = step(m, key("enter"))
-	v := m.View()
+	v := m.View().Content
 	if !strings.Contains(v, "back") {
 		t.Error("detail footer missing 'back'")
 	}
@@ -549,7 +549,7 @@ func TestFooterHelp_DetailMode(t *testing.T) {
 func TestFooterHelp_FilterMode(t *testing.T) {
 	m := newLoaded()
 	m = step(m, key("/"))
-	v := m.View()
+	v := m.View().Content
 	if !strings.Contains(v, "apply") {
 		t.Error("filter footer missing 'apply'")
 	}
@@ -574,7 +574,7 @@ func TestDetailViewShowsProcessTree(t *testing.T) {
 	if len(m.detailPlan.Tree) == 0 {
 		t.Fatal("detailPlan.Tree is empty — detail view would hide the tree")
 	}
-	v := m.View()
+	v := m.View().Content
 	for _, pid := range []string{"1", "100", "101"} {
 		if !strings.Contains(v, pid) {
 			t.Errorf("detail view missing pid %s:\n%s", pid, v)
@@ -594,7 +594,7 @@ func TestDetailViewDockerTree(t *testing.T) {
 	if m.mode != modeDetail {
 		t.Fatalf("mode = %v, want modeDetail", m.mode)
 	}
-	v := m.View()
+	v := m.View().Content
 	if !strings.Contains(v, "docker stop") {
 		t.Errorf("detail view missing 'docker stop' for docker server:\n%s", v)
 	}
@@ -655,7 +655,7 @@ func TestSortCycle(t *testing.T) {
 	}
 
 	// Header should not show sort for default
-	v := m.View()
+	v := m.View().Content
 	if strings.Contains(v, "sort:port") {
 		t.Error("header should not show sort:port (default)")
 	}
@@ -664,7 +664,7 @@ func TestSortCycle(t *testing.T) {
 func TestSortHeaderVisibility(t *testing.T) {
 	m := newLoadedSort()
 	m = step(m, key("s")) // port → uptime
-	v := m.View()
+	v := m.View().Content
 	if !strings.Contains(v, "sort:uptime") {
 		t.Errorf("header missing sort indicator:\n%s", v)
 	}
@@ -672,7 +672,7 @@ func TestSortHeaderVisibility(t *testing.T) {
 
 func TestSortInFooterHelp(t *testing.T) {
 	m := newLoadedSort()
-	v := m.View()
+	v := m.View().Content
 	if !strings.Contains(v, "sort") {
 		t.Errorf("list-mode footer missing 'sort':\n%s", v)
 	}
