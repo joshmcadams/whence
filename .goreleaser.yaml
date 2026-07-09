@@ -8,7 +8,6 @@ project_name: whence
 
 before:
   hooks:
-    - go mod tidy
     - go test ./...
 
 builds:
@@ -60,13 +59,6 @@ homebrew_casks:
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: "https://github.com/joshmcadams/whence"
     description: "Track and manage the dev servers and databases you have running on local ports"
-    # Remove the macOS quarantine attribute so the binary runs without a Gatekeeper prompt.
-    hooks:
-      post:
-        install: |
-          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/whence"]
-          end
 
 # Scoop manifest — requires a bucket repo (github.com/joshmcadams/scoop-bucket) and
 # a SCOOP_BUCKET_GITHUB_TOKEN secret.
