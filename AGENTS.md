@@ -27,9 +27,10 @@ go build ./...             # plain compile, no version stamp
 ```
 
 Always run `make lint` and `make test` before declaring a change done. CI
-(`.github/workflows/ci.yml`) runs gofmt, `go vet`, `go test`, a cross-compile
-matrix (linux/darwin/windows × amd64/arm64), and `goreleaser check` — keep all
-of those green. Toolchain: Go 1.26+ (see `go.mod`).
+(`.github/workflows/ci.yml`) runs golangci-lint (incl. gofmt via formatters),
+`go test`, govulncheck, a cross-compile matrix (linux/darwin/windows ×
+amd64/arm64), and `goreleaser check` — keep all of those green. Toolchain:
+Go 1.25+ (see `go.mod`); dev boxes on newer Go are fine.
 
 ## Architecture — the data flow
 

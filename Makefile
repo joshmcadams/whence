@@ -9,6 +9,9 @@ LDFLAGS := -s -w -X github.com/joshmcadams/whence/internal/cli.version=$(VERSION
 # Args passed to `make run`, e.g. `make run ARGS="list --all"`.
 ARGS ?=
 
+# Pinned golangci-lint version; keep in sync with .github/workflows/ci.yml.
+GOLANGCI_VERSION := v2.12.2
+
 .DEFAULT_GOAL := build
 
 .PHONY: build
@@ -33,7 +36,8 @@ lint: ## Check formatting and run go vet (plus golangci-lint if installed)
 	@if command -v golangci-lint >/dev/null 2>&1; then \
 		golangci-lint run; \
 	else \
-		echo "golangci-lint not installed; ran gofmt + go vet only"; \
+		echo "golangci-lint not installed; ran gofmt + go vet only."; \
+		echo "install: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)"; \
 	fi
 
 .PHONY: fmt

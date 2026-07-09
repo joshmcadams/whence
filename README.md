@@ -31,7 +31,7 @@ PORT  PROTO  PID     UPTIME  SRC     SERVER  DESCRIPTION
 > username/repo differ, update the module path in `go.mod`, the `-X` ldflags
 > path, and the owners in `.goreleaser.yaml` before releasing.
 
-**From source** (Go 1.26+):
+**From source** (Go 1.25+):
 
 ```sh
 go install github.com/joshmcadams/whence/cmd/whence@latest
