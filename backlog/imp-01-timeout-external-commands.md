@@ -1,6 +1,6 @@
 # imp-01 — Time-bound every external command
 
-**Status:** done (branch `improvements`)
+**Status:** done (merged to main)
 **Priority:** high — robustness; affects the default command for everyone
 **Category:** robustness / correctness
 **Effort:** ~45 min

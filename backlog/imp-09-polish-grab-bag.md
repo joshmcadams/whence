@@ -1,6 +1,6 @@
 # imp-09 — Polish grab-bag
 
-**Status:** todo
+**Status:** done (see commit 312965b)
 **Priority:** low — small, independent quality-of-life fixes
 **Category:** UX / polish
 **Effort:** ~15 min each

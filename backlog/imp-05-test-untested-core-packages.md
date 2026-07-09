@@ -1,6 +1,6 @@
 # imp-05 — Test the untested core packages
 
-**Status:** done (branch `improvements`)
+**Status:** done (merged to main)
 **Priority:** medium-high — core logic with subtle edges is currently unguarded
 **Category:** testing
 **Effort:** ~2 hr

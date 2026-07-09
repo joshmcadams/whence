@@ -62,14 +62,17 @@ whence list --json          # machine-readable output
 whence list --port 3000     # only this port
 whence list --sort uptime   # sort by port|uptime|name
 whence list --watch         # live-refresh in place (Ctrl-C to stop)
+whence list --watch --interval 5s   # change the --watch refresh interval (default 2s)
 whence list --no-ignore     # bypass ignore_ports / ignore_names
 
 whence kill 3000            # kill the server on a port
 whence kill myapp           # kill every server in a project (exact name preferred)
 whence kill 3000 --force    # skip the confirmation prompt
 whence kill 3000 --single   # kill only the listening process, not its tree
+whence kill 3000 --timeout 10s   # grace period before SIGKILL (default from config)
 
 whence tui                  # interactive table
+whence tui --all            # start the TUI showing all ports, not just yours
 
 whence doctor               # platform capabilities & diagnostics
 whence config               # show effective config
@@ -100,6 +103,7 @@ on Windows. Run `whence config --init` to scaffold it.
 
 ```toml
 dev_roots = ["/home/you/development", "/home/you/dev", "/home/you/go/src"]
+# default also includes ~/Projects, ~/projects, ~/src, ~/code, ~/Code, ~/work
 ignore_ports = []
 ignore_names = []
 kill_timeout_seconds = 5

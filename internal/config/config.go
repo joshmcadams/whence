@@ -11,8 +11,7 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-// Config is the on-disk configuration. Fields beyond DevRoots are scaffolded
-// now and consumed in later phases.
+// Config is the on-disk configuration.
 type Config struct {
 	// DevRoots are directories under which a process's cwd marks it as "yours".
 	DevRoots []string `toml:"dev_roots"`
@@ -20,9 +19,9 @@ type Config struct {
 	IgnorePorts []int `toml:"ignore_ports"`
 	// IgnoreNames are process names to suppress.
 	IgnoreNames []string `toml:"ignore_names"`
-	// KillTimeoutSeconds is the grace period before SIGKILL (Phase 3).
+	// KillTimeoutSeconds is the grace period before SIGKILL.
 	KillTimeoutSeconds int `toml:"kill_timeout_seconds"`
-	// ConfidenceThreshold is the minimum score to be shown without --all (Phase 2).
+	// ConfidenceThreshold is the minimum score to be shown without --all.
 	ConfidenceThreshold int `toml:"confidence_threshold"`
 	// Theme is the TUI color palette name; unknown values fall back to the default.
 	Theme string `toml:"theme"`

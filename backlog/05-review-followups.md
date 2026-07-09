@@ -1,8 +1,23 @@
 # 05 — Review follow-ups (deferred design calls)
 
-**Status:** todo
+**Status:** done (see commit c864652)
 **Priority:** low — neither is a correctness bug; both are judgement calls
 **Owner:** you
+
+## Resolution
+
+Both trade-offs below were resolved in commit `c864652`:
+
+- **Item 1** (dual-stack rows) — collapsed. `scan.collapseIPv4IPv6` merges
+  `(port, pid)` pairs where both stacks share the same exposure class into one
+  `tcp` row; this is now a documented AGENTS.md invariant, not just a code
+  comment. Genuinely distinct IP bindings and unattributed rows are untouched.
+- **Item 2** (case-insensitive `normalize`) — kept as-is (case-insensitive on
+  all platforms), with a clarifying comment added at
+  `internal/config/config.go` explaining the intentional trade-off so it
+  isn't "fixed" into a platform branch later.
+
+The body below is left as originally filed, for history.
 
 Two findings from the 2026-06-07 critical review. They were reported and left
 unfixed on purpose: each is a deliberate trade-off, not a defect, so the call is

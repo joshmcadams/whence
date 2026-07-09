@@ -1,5 +1,12 @@
 # `whence` — dev server / port tracker
 
+> **Historical design document (June 2026).** This captures the original
+> plan and rationale. Where it disagrees with the code or `AGENTS.md`,
+> they win — notably: dual-stack sockets now collapse to one row
+> (`scan.collapseIPv4IPv6`), the `Server` model gained `Source`/`Name`/
+> `Address`/`Notes`, and the TUI columns/keys evolved. See `AGENTS.md`
+> for current invariants.
+
 A cross-platform CLI + TUI that finds the dev servers and databases **you** are
 running, maps each listening port back to the repo it was launched from, and
 lets you kill them by port or by project.
@@ -27,7 +34,7 @@ listening sockets ──▶ owning PID ──▶ process info ──▶ repo roo
                                       start, ppid)      from cwd)
 ```
 
-1. **Enumerate listening sockets.** `gopsutil/net.Connections("inet")`, keep `LISTEN`, dedupe by `(proto, port)`. IPv4 + IPv6.
+1. **Enumerate listening sockets.** `gopsutil/net.Connections("inet")`, keep `LISTEN`, dedupe by `(proto, port)`. IPv4 + IPv6. (superseded — see banner; dual-stack rows now collapse via `scan.collapseIPv4IPv6`)
 2. **Resolve the owning process.** cmdline, exe, parent PID, **start time** (→ uptime), and the **current working directory**.
 3. **Find the repo root.** Walk up from the process cwd looking for markers: `.git`, `go.mod`, `package.json`, `Makefile`, `pyproject.toml`, `Cargo.toml`, `composer.json`, etc.
 4. **Classify "mine."** Score: cwd/root under a configured dev root → high; repo marker present → medium; dev-server-looking command (`vite`, `next`, `npm run dev`, `nodemon`, `rails s`, `uvicorn`, `air`, `dlv`, a `postgres`/`redis`/`mongod` under a repo, …) → boost. Show if score ≥ threshold; `--all` shows everything.
@@ -122,7 +129,7 @@ whence config             # show / edit config path
 ```
 
 Config at `~/.config/whence/config.toml` (XDG; `%AppData%\whence` on Windows):
-dev roots (default candidates `~/Development`, `~/dev`, `~/Projects`, `~/src`, `~/code`, `~/go/src`), ignore lists (ports / process names), kill timeout, confidence threshold.
+dev roots (default candidates `~/Development`, `~/dev`, `~/Projects`, `~/src`, `~/code`, `~/go/src`), ignore lists (ports / process names), kill timeout, confidence threshold. (superseded — see banner; `config.Default()` now ships 9 candidates)
 
 ---
 
@@ -197,5 +204,4 @@ internal/tui/                # bubbletea model
 - Attribution must read the **tree**, not the leaf PID, or `npm`-wrapped servers get mislabeled.
 - Same-user only without elevation: root-owned listeners (e.g. a native Postgres on `:5432`) show no PID to an unprivileged scan and appear under `--all` only, unattributed. `doctor` and the row flag this.
 - macOS `lsof` may be a hard dependency for socket enumeration, not just cwd — confirm in the spike.
-```
 

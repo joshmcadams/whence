@@ -1,6 +1,6 @@
 # imp-04 — Make `kill <name>` prefer exact matches
 
-**Status:** done (branch `improvements`)
+**Status:** done (merged to main)
 **Priority:** medium-high — destructive over-match
 **Category:** safety / UX
 **Effort:** ~30 min

@@ -1,6 +1,6 @@
 # imp-08 — Eliminate redundant work in the scan path
 
-**Status:** todo
+**Status:** done (see commit 49802a5)
 **Priority:** medium-low — perf; noticeable mainly with many ports / on macOS
 **Category:** performance
 **Effort:** ~1–2 hr (independent sub-items)

@@ -1,6 +1,6 @@
 # imp-06 — Tell the user when servers are hidden
 
-**Status:** todo
+**Status:** done (see commit ca51dfe)
 **Priority:** medium — clarity; avoids a confusing "nothing here" dead end
 **Category:** UX
 **Effort:** ~30 min
