@@ -15,15 +15,30 @@ import (
 )
 
 // Processes scans all listening TCP sockets and returns one Server per
-// (port, proto, pid). Errors fetching details for an individual process are
-// recorded in Server.Notes rather than aborting the whole scan.
+// (port, proto, address, pid). Errors fetching details for an individual
+// process are recorded in Server.Notes rather than aborting the whole scan.
 func Processes() ([]model.Server, error) {
 	conns, err := gnet.Connections("inet")
 	if err != nil {
 		return nil, fmt.Errorf("enumerate sockets: %w", err)
 	}
 
-	now := time.Now()
+	servers := rowsFromConns(conns, time.Now(), enrich)
+	servers = collapseIPv4IPv6(servers)
+	sort.Slice(servers, func(i, j int) bool {
+		if servers[i].Port != servers[j].Port {
+			return servers[i].Port < servers[j].Port
+		}
+		return servers[i].Proto < servers[j].Proto
+	})
+	return servers, nil
+}
+
+// rowsFromConns converts raw connection stats into unenriched server rows:
+// LISTEN filtering, per-(port,proto,address,pid) dedup, and the no-PID note.
+// enrichFn is called for rows with a PID; injected for testability.
+func rowsFromConns(conns []gnet.ConnectionStat, now time.Time,
+	enrichFn func(*model.Server, int32, time.Time)) []model.Server {
 	seen := map[string]bool{}
 	var servers []model.Server
 
@@ -32,7 +47,7 @@ func Processes() ([]model.Server, error) {
 			continue
 		}
 		proto := protoOf(c.Family)
-		key := fmt.Sprintf("%d/%s/%d", c.Laddr.Port, proto, c.Pid)
+		key := fmt.Sprintf("%d/%s/%s/%d", c.Laddr.Port, proto, c.Laddr.IP, c.Pid)
 		if seen[key] {
 			continue
 		}
@@ -46,21 +61,13 @@ func Processes() ([]model.Server, error) {
 			PID:     int(c.Pid),
 		}
 		if c.Pid > 0 {
-			enrich(&s, c.Pid, now)
+			enrichFn(&s, c.Pid, now)
 		} else {
 			s.Notes = append(s.Notes, "no pid (owned by another user; rerun with elevated privileges)")
 		}
 		servers = append(servers, s)
 	}
-
-	servers = collapseIPv4IPv6(servers)
-	sort.Slice(servers, func(i, j int) bool {
-		if servers[i].Port != servers[j].Port {
-			return servers[i].Port < servers[j].Port
-		}
-		return servers[i].Proto < servers[j].Proto
-	})
-	return servers, nil
+	return servers
 }
 
 // collapseIPv4IPv6 merges (port, pid) pairs where the tcp and tcp6 entries

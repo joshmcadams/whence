@@ -2,6 +2,9 @@ package scan
 
 import (
 	"testing"
+	"time"
+
+	gnet "github.com/shirou/gopsutil/v4/net"
 
 	"github.com/joshmcadams/whence/internal/model"
 )
@@ -55,6 +58,128 @@ func TestCollapseIPv4IPv6_NoPID(t *testing.T) {
 	got := collapseIPv4IPv6(in)
 	if len(got) != 2 {
 		t.Fatalf("expected 2 servers (no pid = no collapse), got %d", len(got))
+	}
+}
+
+func TestRowsFromConns_DropsNonListen(t *testing.T) {
+	conns := []gnet.ConnectionStat{
+		{Status: "ESTABLISHED", Family: 2, Laddr: gnet.Addr{IP: "10.0.0.1", Port: 443}, Pid: 100},
+		{Status: "LISTEN", Family: 2, Laddr: gnet.Addr{IP: "127.0.0.1", Port: 8080}, Pid: 100},
+	}
+	noop := func(*model.Server, int32, time.Time) {}
+	got := rowsFromConns(conns, time.Now(), noop)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 row (non-LISTEN dropped), got %d", len(got))
+	}
+	if got[0].Port != 8080 {
+		t.Errorf("expected surviving row to be port 8080, got %d", got[0].Port)
+	}
+}
+
+func TestRowsFromConns_DedupsExactDuplicates(t *testing.T) {
+	conns := []gnet.ConnectionStat{
+		{Status: "LISTEN", Family: 2, Laddr: gnet.Addr{IP: "127.0.0.1", Port: 8080}, Pid: 100},
+		{Status: "LISTEN", Family: 2, Laddr: gnet.Addr{IP: "127.0.0.1", Port: 8080}, Pid: 100},
+	}
+	noop := func(*model.Server, int32, time.Time) {}
+	got := rowsFromConns(conns, time.Now(), noop)
+	if len(got) != 1 {
+		t.Fatalf("expected exact duplicates to dedup to 1 row, got %d", len(got))
+	}
+}
+
+func TestRowsFromConns_DistinctUnattributedListenersSurvive(t *testing.T) {
+	// Two different unattributed (Pid=0) processes on the same port/proto but
+	// different bind addresses must both survive — this is the fix. Against
+	// the old (port, proto, pid) key, these would incorrectly collapse to 1.
+	conns := []gnet.ConnectionStat{
+		{Status: "LISTEN", Family: 2, Laddr: gnet.Addr{IP: "127.0.0.53", Port: 53}, Pid: 0},
+		{Status: "LISTEN", Family: 2, Laddr: gnet.Addr{IP: "192.168.122.1", Port: 53}, Pid: 0},
+	}
+	noop := func(*model.Server, int32, time.Time) {}
+	got := rowsFromConns(conns, time.Now(), noop)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 distinct unattributed listeners on port 53, got %d", len(got))
+	}
+}
+
+func TestRowsFromConns_NoPIDGetsNoteAndSkipsEnrich(t *testing.T) {
+	conns := []gnet.ConnectionStat{
+		{Status: "LISTEN", Family: 2, Laddr: gnet.Addr{IP: "0.0.0.0", Port: 53}, Pid: 0},
+	}
+	called := false
+	enrichFn := func(*model.Server, int32, time.Time) { called = true }
+	got := rowsFromConns(conns, time.Now(), enrichFn)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(got))
+	}
+	if called {
+		t.Error("enrichFn must not be called for a PID=0 row")
+	}
+	found := false
+	for _, n := range got[0].Notes {
+		if n == "no pid (owned by another user; rerun with elevated privileges)" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected no-pid note, got notes=%v", got[0].Notes)
+	}
+}
+
+func TestRowsFromConns_PIDCallsEnrichOnce(t *testing.T) {
+	conns := []gnet.ConnectionStat{
+		{Status: "LISTEN", Family: 2, Laddr: gnet.Addr{IP: "127.0.0.1", Port: 8080}, Pid: 42},
+	}
+	var callCount int
+	var gotPid int32
+	enrichFn := func(_ *model.Server, pid int32, _ time.Time) {
+		callCount++
+		gotPid = pid
+	}
+	got := rowsFromConns(conns, time.Now(), enrichFn)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(got))
+	}
+	if callCount != 1 {
+		t.Errorf("expected enrichFn called exactly once, got %d", callCount)
+	}
+	if gotPid != 42 {
+		t.Errorf("expected enrichFn called with pid 42, got %d", gotPid)
+	}
+}
+
+func TestRowsFromConns_DualStackSamePID_CollapsesViaCollapseIPv4IPv6(t *testing.T) {
+	conns := []gnet.ConnectionStat{
+		{Status: "LISTEN", Family: 2, Laddr: gnet.Addr{IP: "0.0.0.0", Port: 3000}, Pid: 42},
+		{Status: "LISTEN", Family: 10, Laddr: gnet.Addr{IP: "::", Port: 3000}, Pid: 42},
+	}
+	noop := func(*model.Server, int32, time.Time) {}
+	rows := rowsFromConns(conns, time.Now(), noop)
+	if len(rows) != 2 {
+		t.Fatalf("expected rowsFromConns to keep both dual-stack rows (collapse happens downstream), got %d", len(rows))
+	}
+
+	collapsed := collapseIPv4IPv6(rows)
+	if len(collapsed) != 1 {
+		t.Fatalf("expected collapseIPv4IPv6 to merge the dual-stack pair into 1 row, got %d", len(collapsed))
+	}
+	if collapsed[0].Proto != "tcp" || collapsed[0].Address != "0.0.0.0" {
+		t.Errorf("collapsed entry: proto=%q address=%q, want tcp/0.0.0.0", collapsed[0].Proto, collapsed[0].Address)
+	}
+}
+
+func TestRowsFromConns_WildcardAddressExposureAll(t *testing.T) {
+	conns := []gnet.ConnectionStat{
+		{Status: "LISTEN", Family: 2, Laddr: gnet.Addr{IP: "*", Port: 8080}, Pid: 42},
+	}
+	noop := func(*model.Server, int32, time.Time) {}
+	got := rowsFromConns(conns, time.Now(), noop)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(got))
+	}
+	if got[0].Exposure() != "all" {
+		t.Errorf("Exposure() for wildcard address %q = %q, want %q", got[0].Address, got[0].Exposure(), "all")
 	}
 }
 
