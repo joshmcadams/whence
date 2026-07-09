@@ -22,7 +22,7 @@ Repo ground rules that apply to EVERY plan (from `AGENTS.md`):
 | 001 | Characterization tests for the kill execution path | P1 | M | — | DONE (see note) |
 | 002 | Harden kill targeting: identity re-check, cycle guards, zombie-aware liveness | P1 | M | 001 | DONE |
 | 003 | Sanitize untrusted strings at every terminal render boundary | P1 | S | — | DONE |
-| 004 | Recognize `.git` files (worktrees/submodules) in project root detection | P1 | S | — | TODO |
+| 004 | Recognize `.git` files (worktrees/submodules) in project root detection | P1 | S | — | DONE |
 | 005 | Scan row correctness: address-aware dedup, `*` exposure, extraction for tests | P1 | M | — | TODO |
 | 006 | Inventory merge correctness + docker JSON contract tests | P1 | M | — | TODO |
 | 007 | Toolchain/CI cluster: go directive, pinned lint, gofmt enforcement, govulncheck | P1 | S | — | TODO |
@@ -133,6 +133,21 @@ in different packages and don't conflict. Everything touching `internal/tui/tui.
   tabwriter column breakage — none found. Three uncached re-runs of the
   affected packages showed no flakiness; all test-file diffs are purely
   additive (zero deletions).
+
+- **004 — DONE.** No drift, no reconciliation needed. Executed in worktree
+  branch `worktree-agent-a679464028245c380` (commit branch
+  `advisor/004-worktree-git-file`), reviewed and approved 2026-07-09.
+  `findRoot` now accepts `.git` as a file (git worktrees, submodules) or a
+  directory via the existing `exists()` helper; the now-dead `isDir` helper
+  was removed (not explicitly in the plan, but verified to have exactly one
+  caller in the whole repo, and removal was forced by the plan's own
+  `make lint` done criterion — approved on merit). Reviewer independently
+  reverted the fix and re-ran the two new tests against the old code: the
+  no-over-walk case resolved to the *outer* enclosing repo's root, a clean
+  live demonstration of the bug this plan fixes (a worktree/submodule server
+  would otherwise misattribute to the wrong project, feeding wrong results
+  into `whence kill <name>`). Three uncached re-runs, full lint/test gate,
+  and `git status` cleanliness all independently confirmed.
 
 ## Findings considered and rejected (do not re-audit)
 
