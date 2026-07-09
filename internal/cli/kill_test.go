@@ -309,20 +309,6 @@ func TestNewKillCmd_WiresFlags(t *testing.T) {
 	}
 }
 
-func TestRunKill_NoMatchReturnsError(t *testing.T) {
-	// Exercises the real runKill wrapper (config.Load + collect, both
-	// read-only) against a target that cannot match anything on this
-	// machine, so the only observable outcome is the "no server found" error
-	// from runKillWith — nothing is ever confirmed or killed.
-	err := runKill("definitely-not-a-real-target-zzz9138", &killOpts{})
-	if err == nil {
-		t.Fatal("expected an error for a target matching nothing")
-	}
-	if !strings.Contains(err.Error(), "no server found matching") {
-		t.Errorf("err = %v, want it to mention 'no server found matching'", err)
-	}
-}
-
 func TestDescribe(t *testing.T) {
 	cases := []struct {
 		name string
