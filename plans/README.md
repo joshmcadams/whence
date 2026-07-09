@@ -20,7 +20,7 @@ Repo ground rules that apply to EVERY plan (from `AGENTS.md`):
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
 | 001 | Characterization tests for the kill execution path | P1 | M | — | DONE (see note) |
-| 002 | Harden kill targeting: identity re-check, cycle guards, zombie-aware liveness | P1 | M | 001 | TODO |
+| 002 | Harden kill targeting: identity re-check, cycle guards, zombie-aware liveness | P1 | M | 001 | DONE |
 | 003 | Sanitize untrusted strings at every terminal render boundary | P1 | S | — | TODO |
 | 004 | Recognize `.git` files (worktrees/submodules) in project root detection | P1 | S | — | TODO |
 | 005 | Scan row correctness: address-aware dedup, `*` exposure, extraction for tests | P1 | M | — | TODO |
@@ -95,6 +95,25 @@ in different packages and don't conflict. Everything touching `internal/tui/tui.
   seam rename); no files outside the in-scope list were touched; `make lint`
   and `make test` pass; three uncached re-runs of the affected packages showed
   no flakiness. Plan 002 may now proceed — its safety net is in place.
+
+- **002 — DONE.** Executed in worktree branch `worktree-agent-a6b454e8f04608f7c`
+  (final branch `advisor/002-kill-hardening`), reviewed and approved 2026-07-09.
+  `climb`/`subtree` gained cycle guards (verified with a goroutine+5s-timeout
+  test so a regression fails the test instead of hanging the suite); `isAlive`
+  now treats zombies as dead; `killProcess` verifies the scanned PID's create
+  time (±2s epsilon) before signaling and refuses with "target changed since
+  scan" on mismatch — nothing is signaled on refusal (test-proven). Reviewer
+  independently reproduced the real end-to-end happy path (started a disposable
+  `python3 -m http.server`, killed it through the new identity-gated path,
+  confirmed the port closed) to rule out false refusals, in addition to running
+  the full done-criteria list, three uncached re-runs, and both cross-compiles.
+  No files outside scope touched; only deletion in the whole test diff is the
+  seam-save helper being extended for the new `processCreateTime` seam — zero
+  existing assertions changed. One incident during execution: the executor
+  briefly ran a git checkout in the shared main tree instead of its assigned
+  worktree (caught immediately by the harness's isolation guard before any
+  file changed, self-corrected); reviewer audited the shared tree's reflog and
+  status afterward and confirmed no lasting effect.
 
 ## Findings considered and rejected (do not re-audit)
 
