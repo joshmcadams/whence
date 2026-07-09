@@ -46,6 +46,10 @@ go install github.com/joshmcadams/whence/cmd/whence@latest
 brew install --cask joshmcadams/tap/whence
 ```
 
+> macOS will show a one-time Gatekeeper prompt on first run because the
+> binary is not notarized (right-click → Open, or
+> `xattr -d com.apple.quarantine $(which whence)` if you accept the binary).
+
 **Scoop** (Windows):
 
 ```sh
