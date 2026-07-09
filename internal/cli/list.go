@@ -29,11 +29,15 @@ type listOpts struct {
 func newListCmd() *cobra.Command {
 	o := &listOpts{}
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List your dev servers (use --all to include system/standard ports)",
-		Args:  cobra.NoArgs,
+		Use:   "list [query]",
+		Short: "List dev servers; optionally filter by a query (name, description, or port)",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runListWith(o)
+			query := ""
+			if len(args) > 0 {
+				query = args[0]
+			}
+			return runListWith(o, query)
 		},
 	}
 	f := cmd.Flags()
@@ -49,10 +53,10 @@ func newListCmd() *cobra.Command {
 
 // runList is the default action when `whence` is run with no subcommand.
 func runList(cmd *cobra.Command, _ []string) error {
-	return runListWith(&listOpts{sortBy: "port"})
+	return runListWith(&listOpts{sortBy: "port"}, "")
 }
 
-func runListWith(o *listOpts) error {
+func runListWith(o *listOpts, query string) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return err
@@ -65,10 +69,10 @@ func runListWith(o *listOpts) error {
 		if o.interval < 500*time.Millisecond {
 			return fmt.Errorf("--interval must be at least 500ms (got %s)", o.interval)
 		}
-		return watchList(cfg, o)
+		return watchList(cfg, o, query)
 	}
 
-	servers, hidden, err := listOnce(cfg, o)
+	servers, hidden, err := listOnce(cfg, o, query)
 	if err != nil {
 		return err
 	}
@@ -79,7 +83,7 @@ func runListWith(o *listOpts) error {
 	return nil
 }
 
-func listOnce(cfg config.Config, o *listOpts) ([]model.Server, int, error) {
+func listOnce(cfg config.Config, o *listOpts, query string) ([]model.Server, int, error) {
 	raw, err := collect(cfg)
 	if err != nil {
 		return nil, 0, err
@@ -90,12 +94,12 @@ func listOnce(cfg config.Config, o *listOpts) ([]model.Server, int, error) {
 		cfg.IgnorePorts = nil
 		cfg.IgnoreNames = nil
 	}
-	servers := inventory.View(raw, cfg, o.all, o.port, "")
+	servers := inventory.View(raw, cfg, o.all, o.port, query)
 	inventory.Sort(servers, o.sortBy)
 
 	hidden := 0
 	if !o.all {
-		allView := inventory.View(raw, cfg, true, o.port, "")
+		allView := inventory.View(raw, cfg, true, o.port, query)
 		hidden = len(allView) - len(servers)
 	}
 	return servers, hidden, nil
@@ -105,9 +109,9 @@ func listOnce(cfg config.Config, o *listOpts) ([]model.Server, int, error) {
 // Each frame is buffered then written line-by-line with an erase-to-end-of-line
 // escape (\033[K) so the terminal never flashes blank and trailing characters
 // from a wider previous frame don't bleed through.
-func watchList(cfg config.Config, o *listOpts) error {
+func watchList(cfg config.Config, o *listOpts, query string) error {
 	for {
-		servers, hidden, err := listOnce(cfg, o)
+		servers, hidden, err := listOnce(cfg, o, query)
 		if err != nil {
 			return err
 		}
