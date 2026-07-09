@@ -3,7 +3,9 @@ package kill
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"reflect"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -83,6 +85,47 @@ func TestPlanTree_ClimbsAndIncludesSiblings(t *testing.T) {
 	}
 }
 
+func TestClimbCycle_DoesNotHang(t *testing.T) {
+	// A ppid cycle between two launcher-named pids: 100 -> 200 -> 100. Both
+	// named "npm" so the launcher check alone would loop forever without a
+	// visited-set guard.
+	tbl := table(
+		map[int]int{100: 200, 200: 100},
+		map[int]string{100: "npm", 200: "npm"},
+	)
+	done := make(chan int, 1)
+	go func() { done <- climb(100, tbl) }()
+	select {
+	case got := <-done:
+		if got != 100 && got != 200 {
+			t.Errorf("climb = %d, want one of the cycle members (100 or 200)", got)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("climb did not return within 5s — cycle guard missing")
+	}
+}
+
+func TestSubtreeCycle_DoesNotHangAndDedupes(t *testing.T) {
+	// A child-link cycle: 100 <-> 200 (each lists the other as a child).
+	tbl := procTable{
+		ppid:     map[int]int{},
+		name:     map[int]string{100: "npm", 200: "npm"},
+		children: map[int][]int{100: {200}, 200: {100}},
+	}
+	done := make(chan []int, 1)
+	go func() { done <- subtree(100, tbl) }()
+	select {
+	case got := <-done:
+		sort.Ints(got)
+		want := []int{100, 200}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("subtree = %v, want %v (each pid exactly once)", got, want)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("subtree did not return within 5s — cycle guard missing")
+	}
+}
+
 func TestSubtree(t *testing.T) {
 	tbl := table(
 		map[int]int{200: 100, 300: 200, 400: 300, 500: 200},
@@ -126,14 +169,15 @@ func TestPreviewWith_ClimbsTree(t *testing.T) {
 // forceKillPID/pidAlive/dockerCombinedOutput without leaking into other tests.
 func saveKillSeams(t *testing.T) {
 	t.Helper()
-	origSnap, origTerm, origForce, origAlive, origDocker :=
-		takeSnapshot, terminatePID, forceKillPID, pidAlive, dockerCombinedOutput
+	origSnap, origTerm, origForce, origAlive, origDocker, origCreateTime :=
+		takeSnapshot, terminatePID, forceKillPID, pidAlive, dockerCombinedOutput, processCreateTime
 	t.Cleanup(func() {
 		takeSnapshot = origSnap
 		terminatePID = origTerm
 		forceKillPID = origForce
 		pidAlive = origAlive
 		dockerCombinedOutput = origDocker
+		processCreateTime = origCreateTime
 	})
 }
 
@@ -301,6 +345,126 @@ func TestServer_NoPIDReturnsError(t *testing.T) {
 	}
 	if res.Err == nil || !strings.Contains(res.Err.Error(), "no accessible pid") {
 		t.Errorf("Err = %v, want it to contain %q", res.Err, "no accessible pid")
+	}
+}
+
+// --- identity re-check characterization tests --------------------------------
+
+func TestServer_IdentityMatchProceedsWithKill(t *testing.T) {
+	saveKillSeams(t)
+	tbl := launcherTree()
+	takeSnapshot = func() procTable { return tbl }
+
+	scanned := time.Now()
+	processCreateTime = func(pid int) (time.Time, error) { return scanned, nil }
+
+	var mu sync.Mutex
+	terminated := map[int]int{}
+	terminatePID = func(pid int) error {
+		mu.Lock()
+		terminated[pid]++
+		mu.Unlock()
+		return nil
+	}
+	pidAlive = func(pid int) bool { return false }
+	forceKillPID = func(pid int) error { return nil }
+
+	res := Server(model.Server{Source: model.SourceProcess, PID: 3, StartTime: scanned}, Opts{Timeout: 300 * time.Millisecond})
+	if !res.Killed || res.Err != nil {
+		t.Fatalf("Killed=%v Err=%v, want success when create times match", res.Killed, res.Err)
+	}
+	want := []int{2, 3, 4}
+	for _, p := range want {
+		if terminated[p] != 1 {
+			t.Errorf("pid %d terminated %d time(s), want exactly 1", p, terminated[p])
+		}
+	}
+}
+
+func TestServer_IdentityMismatchRefusesWithoutSignaling(t *testing.T) {
+	saveKillSeams(t)
+	tbl := launcherTree()
+	takeSnapshot = func() procTable { return tbl }
+
+	scanned := time.Now()
+	processCreateTime = func(pid int) (time.Time, error) { return scanned.Add(time.Minute), nil }
+
+	terminateCalled := false
+	terminatePID = func(pid int) error {
+		terminateCalled = true
+		return nil
+	}
+	forceKillPID = func(pid int) error { return nil }
+
+	res := Server(model.Server{Source: model.SourceProcess, PID: 3, StartTime: scanned}, Opts{Timeout: 300 * time.Millisecond})
+	if res.Killed {
+		t.Error("Killed = true, want false on identity mismatch")
+	}
+	if res.Err == nil || !strings.Contains(res.Err.Error(), "target changed since scan") {
+		t.Errorf("Err = %v, want it to contain %q", res.Err, "target changed since scan")
+	}
+	if terminateCalled {
+		t.Error("terminatePID must not be called when identity verification refuses the kill")
+	}
+}
+
+func TestServer_ZeroStartTimeSkipsIdentityCheck(t *testing.T) {
+	saveKillSeams(t)
+	tbl := launcherTree()
+	takeSnapshot = func() procTable { return tbl }
+
+	createTimeCalled := false
+	processCreateTime = func(pid int) (time.Time, error) {
+		createTimeCalled = true
+		return time.Time{}, nil
+	}
+
+	var mu sync.Mutex
+	terminated := map[int]int{}
+	terminatePID = func(pid int) error {
+		mu.Lock()
+		terminated[pid]++
+		mu.Unlock()
+		return nil
+	}
+	pidAlive = func(pid int) bool { return false }
+	forceKillPID = func(pid int) error { return nil }
+
+	res := Server(model.Server{Source: model.SourceProcess, PID: 3}, Opts{Timeout: 300 * time.Millisecond}) // StartTime zero
+	if !res.Killed || res.Err != nil {
+		t.Fatalf("Killed=%v Err=%v, want success when StartTime is zero (nothing to compare)", res.Killed, res.Err)
+	}
+	if createTimeCalled {
+		t.Error("processCreateTime must not be called when the scanned StartTime is zero")
+	}
+	if len(terminated) == 0 {
+		t.Error("expected the kill to proceed and signal the tree")
+	}
+}
+
+func TestServer_CreateTimeReadErrorRefusesWithoutSignaling(t *testing.T) {
+	saveKillSeams(t)
+	tbl := launcherTree()
+	takeSnapshot = func() procTable { return tbl }
+
+	scanned := time.Now()
+	processCreateTime = func(pid int) (time.Time, error) { return time.Time{}, errors.New("no such process") }
+
+	terminateCalled := false
+	terminatePID = func(pid int) error {
+		terminateCalled = true
+		return nil
+	}
+
+	res := Server(model.Server{Source: model.SourceProcess, PID: 3, StartTime: scanned}, Opts{Timeout: 300 * time.Millisecond})
+	if res.Killed {
+		t.Error("Killed = true, want false when create time is unreadable")
+	}
+	if res.Err == nil || !strings.Contains(res.Err.Error(), "target changed since scan") {
+		t.Errorf("Err = %v, want it to contain %q", res.Err, "target changed since scan")
+	}
+	if terminateCalled {
+		t.Error("terminatePID must not be called when identity verification refuses the kill")
 	}
 }
 
@@ -476,6 +640,23 @@ func TestIsAlive(t *testing.T) {
 	if isAlive(999999999) {
 		t.Error("isAlive(implausibly large pid) = true, want false")
 	}
+}
+
+func TestIsAliveZombie(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("zombie processes are a POSIX concept; Windows has no equivalent")
+	}
+	cmd := exec.Command("sleep", "0.01")
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("failed to start child process: %v", err)
+	}
+	// Give the child time to exit without being reaped (no cmd.Wait() yet),
+	// leaving it a zombie.
+	time.Sleep(200 * time.Millisecond)
+	if isAlive(cmd.Process.Pid) {
+		t.Error("isAlive(zombie pid) = true, want false")
+	}
+	_ = cmd.Wait() // reap the child so it doesn't linger
 }
 
 func TestSnapshot_IncludesCurrentProcess(t *testing.T) {

@@ -44,3 +44,14 @@ in exactly one place — `planTree(pid, single, tbl)` — which both `killProces
 (the action) and `Preview` (the confirmation in `cli/kill.go`) call. If you
 change how scope is resolved, change `planTree`; never recompute the tree
 separately in one path, or the prompt and the kill will drift apart.
+
+## Identity re-check, cycle guards, zombie-aware liveness
+
+Before signaling anything, `killProcess` compares the scanned PID's OS-reported
+create time against `Server.StartTime` (±2s, via `verifyIdentity`) and refuses
+with "target changed since scan" on mismatch or an unreadable create time —
+nothing is signaled on refusal. A zero `StartTime` skips the check (nothing to
+compare against). `climb`/`subtree` carry a visited-set guard so a ppid/child
+cycle in the process table can't hang a kill or double-count a pid. `isAlive`
+treats a zombie (`process.Status() == process.Zombie`) as dead so a killed-but-
+not-yet-reaped child doesn't burn the full grace period as a false survivor.
