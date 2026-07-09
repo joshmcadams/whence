@@ -7,6 +7,7 @@ import (
 )
 
 // collect returns the full merged inventory (native + Docker), unfiltered.
-func collect(cfg config.Config) ([]model.Server, error) {
+// Declared as a package var so tests can swap in a fixture.
+var collect = func(cfg config.Config) ([]model.Server, error) {
 	return inventory.Collect(cfg)
 }

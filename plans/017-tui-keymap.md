@@ -5,7 +5,7 @@
 > update this plan's status row in `plans/README.md` — unless a reviewer told
 > you they maintain the index.
 >
-> **Drift check (run first)**: `git diff --stat caec51a..HEAD -- internal/tui README.md`
+> **Drift check (run first)**: `git diff --stat bc713ee..HEAD -- internal/tui README.md`
 > Plans 009/013/014 land before this one and reshape parts of `tui.go`;
 > treat their landed state as the base — the excerpts below are from
 > `caec51a` and show SHAPES, not exact lines.

@@ -162,6 +162,71 @@ func TestPreviewWith_ClimbsTree(t *testing.T) {
 	}
 }
 
+func TestPreviewBoth_SingleSnapshotBothScopes(t *testing.T) {
+	saveKillSeams(t)
+	tbl := table(
+		map[int]int{2: 1, 3: 2, 4: 2},
+		map[int]string{1: "bash", 2: "make", 3: "node", 4: "node"},
+	)
+	var captured int
+	takeSnapshot = func() procTable {
+		captured++
+		return tbl
+	}
+
+	tree, single := PreviewBoth(model.Server{Source: model.SourceProcess, PID: 3}, Opts{})
+	if captured != 1 {
+		t.Errorf("PreviewBoth took %d snapshots, want exactly 1", captured)
+	}
+	treePids := make([]int, len(tree.Tree))
+	for i, m := range tree.Tree {
+		treePids[i] = m.PID
+	}
+	sort.Ints(treePids)
+	if !reflect.DeepEqual(treePids, []int{2, 3, 4}) {
+		t.Errorf("tree pids = %v, want [2 3 4]", treePids)
+	}
+	singlePids := make([]int, len(single.Tree))
+	for i, m := range single.Tree {
+		singlePids[i] = m.PID
+	}
+	if !reflect.DeepEqual(singlePids, []int{3}) {
+		t.Errorf("single pids = %v, want [3]", singlePids)
+	}
+}
+
+func TestPreviewBoth_DockerReturnsMatchingFlagPairs(t *testing.T) {
+	s := model.Server{Source: model.SourceDocker, Name: "web-1"}
+	tree, single := PreviewBoth(s, Opts{})
+	for _, p := range []Plan{tree, single} {
+		if !p.Docker {
+			t.Error("docker-sourced PreviewBoth should return Docker=true plans")
+		}
+		if p.NoPID {
+			t.Error("docker-sourced PreviewBoth should not return NoPID=true plans")
+		}
+		if len(p.Tree) != 0 {
+			t.Error("docker-sourced PreviewBoth should have an empty Tree")
+		}
+	}
+}
+
+func TestPreviewBoth_NoPIDReturnsMatchingFlagPairs(t *testing.T) {
+	s := model.Server{Source: model.SourceProcess, PID: 0}
+	tree, single := PreviewBoth(s, Opts{})
+	for _, p := range []Plan{tree, single} {
+		if !p.NoPID {
+			t.Error("no-pid PreviewBoth should return NoPID=true plans")
+		}
+		if p.Docker {
+			t.Error("no-pid PreviewBoth should not return Docker=true plans")
+		}
+		if len(p.Tree) != 0 {
+			t.Error("no-pid PreviewBoth should have an empty Tree")
+		}
+	}
+}
+
 // --- execution-path characterization tests ----------------------------------
 //
 // saveKillSeams snapshots the package-level seam vars and restores them on

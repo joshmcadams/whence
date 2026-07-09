@@ -17,7 +17,7 @@
 - **Risk**: LOW (display-only; existing tests pin the important substrings)
 - **Depends on**: plans/003-terminal-escape-sanitization.md
 - **Category**: tech-debt
-- **Planned at**: commit `caec51a`, 2026-07-09
+- **Planned at**: commit `bc713ee`, 2026-07-09
 
 ## Why this matters
 

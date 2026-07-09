@@ -55,7 +55,8 @@ type Model struct {
 	all        bool
 	query      string
 	selected   pm.Server
-	plan       kill.Plan // blast radius for the pending confirm
+	planTree   kill.Plan // blast radius whole-tree plan for the pending confirm
+	planSingle kill.Plan // blast radius single-listener plan for the pending confirm
 	killSingle bool      // confirm-time toggle: listener-only vs whole tree
 	theme      Theme
 
@@ -67,6 +68,8 @@ type Model struct {
 	loadSeq    int  // last sequence number issued to a load command
 	appliedSeq int  // last sequence number applied to raw/rows
 	loading    bool // true while a load command is in flight
+
+	previewBoth func(pm.Server, kill.Opts) (kill.Plan, kill.Plan) // test seam
 }
 
 // New constructs the model.
@@ -83,6 +86,7 @@ func New(cfg config.Config, all bool) Model {
 
 	m := Model{
 		cfg: cfg, all: all, table: t, ti: ti, theme: ThemeByName(cfg.Theme),
+		previewBoth: kill.PreviewBoth,
 		// appliedSeq starts below any real sequence number (which starts at
 		// 0) so the very first loadedMsg — issued by hand at seq 0 from
 		// Init, see below — is never dropped as stale. loading starts true
@@ -281,11 +285,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.status = "killing " + describe(m.selected) + "…"
 			return m, killCmd(m.selected, opts)
 		case "s":
-			// Toggle whole-tree vs listener-only (native processes only) and
-			// re-preview so the box reflects the new scope.
-			if !m.plan.Docker && !m.plan.NoPID {
+			// Toggle whole-tree vs listener-only (native processes only)
+			// without re-previewing — both scopes were captured at x-press.
+			plan := m.currentPlan()
+			if !plan.Docker && !plan.NoPID {
 				m.killSingle = !m.killSingle
-				m.plan = kill.Preview(m.selected, m.killOpts())
 			}
 			return m, nil
 		default: // n, esc, anything
@@ -324,7 +328,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if s, ok := m.current(); ok {
 			m.selected = s
 			m.killSingle = false
-			m.plan = kill.Preview(s, m.killOpts())
+			m.planTree, m.planSingle = m.previewBoth(s, m.killOpts())
 			m.mode = modeConfirm
 		}
 		return m, nil
@@ -380,6 +384,16 @@ func (m *Model) rebuild() {
 		}
 	}
 	m.table.SetRows(rows)
+}
+
+// currentPlan returns the confirm plan for the active scope (whole-tree or
+// listener-only), keeping confirmView aware of the toggle state without
+// storing a redundant field.
+func (m Model) currentPlan() kill.Plan {
+	if m.killSingle {
+		return m.planSingle
+	}
+	return m.planTree
 }
 
 // --- view -------------------------------------------------------------------
@@ -442,7 +456,7 @@ const maxConfirmTreeLines = 12
 // the same kill.Plan the actual kill will act on, so it can't understate what
 // dies — the safety property the CLI confirmation already has.
 func (m Model) confirmView() string {
-	p := m.plan
+	p := m.currentPlan()
 	var b strings.Builder
 
 	head := "Kill " + describe(m.selected)

@@ -15,7 +15,7 @@
 - **Risk**: MED (matching is user-facing behavior with deliberate per-surface differences; the point is to preserve them explicitly)
 - **Depends on**: none
 - **Category**: tech-debt
-- **Planned at**: commit `caec51a`, 2026-07-09
+- **Planned at**: commit `bc713ee`, 2026-07-09
 
 ## Why this matters
 

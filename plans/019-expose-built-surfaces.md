@@ -17,7 +17,7 @@
 - **Risk**: LOW-MED (new surface, but every engine piece already exists and is tested)
 - **Depends on**: plans/013-remaining-test-seams.md (preview seam); plans/017 preferred first (keymap) but not required
 - **Category**: direction
-- **Planned at**: commit `caec51a`, 2026-07-09
+- **Planned at**: commit `bc713ee`, 2026-07-09
 
 ## Why this matters
 

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/BurntSushi/toml"
@@ -17,29 +18,34 @@ func newConfigCmd() *cobra.Command {
 		Short: "Show the effective configuration, or write a default config file",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if doInit {
-				if _, err := os.Stat(config.Path()); err == nil {
-					return fmt.Errorf("config already exists at %s (remove it first to re-init)", config.Path())
-				}
-				p, err := config.Save(config.Default())
-				if err != nil {
-					return err
-				}
-				fmt.Println("wrote default config to", p)
-				return nil
-			}
-
-			cfg, err := config.Load()
-			if err != nil {
-				return err
-			}
-			fmt.Println("# path:", config.Path())
-			if _, err := os.Stat(config.Path()); err != nil {
-				fmt.Println("# (file not present — showing built-in defaults; run `whence config --init` to write it)")
-			}
-			return toml.NewEncoder(os.Stdout).Encode(cfg)
+			return runConfig(os.Stdout, doInit)
 		},
 	}
 	cmd.Flags().BoolVar(&doInit, "init", false, "write a default config file to the config path")
 	return cmd
+}
+
+func runConfig(out io.Writer, doInit bool) error {
+	if doInit {
+		path := config.Path()
+		if _, err := os.Stat(path); err == nil {
+			return fmt.Errorf("config already exists at %s (remove it first to re-init)", path)
+		}
+		p, err := config.Save(config.Default())
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(out, "wrote default config to", p)
+		return nil
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(out, "# path:", config.Path())
+	if _, err := os.Stat(config.Path()); err != nil {
+		fmt.Fprintln(out, "# (file not present — showing built-in defaults; run `whence config --init` to write it)")
+	}
+	return toml.NewEncoder(out).Encode(cfg)
 }

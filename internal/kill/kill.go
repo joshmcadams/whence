@@ -75,6 +75,27 @@ func Preview(s model.Server, o Opts) Plan {
 	return previewWith(s, o, takeSnapshot())
 }
 
+// PreviewBoth computes the whole-tree and listener-only Plans from a single
+// process-table snapshot, so a confirmation UI can toggle scope without
+// re-snapshotting.
+func PreviewBoth(s model.Server, o Opts) (tree, single Plan) {
+	if s.Source == model.SourceDocker {
+		p := Plan{Server: s, Docker: true}
+		return p, p
+	}
+	if s.PID <= 0 {
+		p := Plan{Server: s, NoPID: true}
+		return p, p
+	}
+	tbl := takeSnapshot()
+	oo := o
+	oo.Single = false
+	tree = previewWith(s, oo, tbl)
+	oo.Single = true
+	single = previewWith(s, oo, tbl)
+	return tree, single
+}
+
 // PreviewBatch computes Plans for multiple servers with a single process-table
 // snapshot, avoiding the N-snapshot cost when previewing a multi-port kill.
 func PreviewBatch(servers []model.Server, o Opts) []Plan {

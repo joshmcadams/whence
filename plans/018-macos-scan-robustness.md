@@ -5,7 +5,7 @@
 > update this plan's status row in `plans/README.md` — unless a reviewer told
 > you they maintain the index.
 >
-> **Drift check (run first)**: `git diff --stat caec51a..HEAD -- internal/scan internal/cli/doctor.go AGENTS.md`
+> **Drift check (run first)**: `git diff --stat bc713ee..HEAD -- internal/scan internal/cli/doctor.go AGENTS.md`
 > Plan 005 must be DONE — this plan plugs into the `rowsFromConns`/enrich
 > shape it created.
 >

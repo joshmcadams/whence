@@ -1,6 +1,8 @@
 package classify
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/joshmcadams/whence/internal/config"
@@ -57,5 +59,89 @@ func TestMineThreshold(t *testing.T) {
 	}
 	if Mine(model.Server{Confidence: 40}, cfg) {
 		t.Error("confidence 40 should not clear threshold 50")
+	}
+}
+
+func TestProcess_DockerSkipped(t *testing.T) {
+	cfg := config.Config{DevRoots: []string{}, ConfidenceThreshold: 50}
+	servers := []model.Server{
+		{Source: model.SourceDocker, Name: "web-1", Confidence: 80},
+	}
+	Process(servers, cfg)
+	if servers[0].Confidence != 80 {
+		t.Errorf("docker server confidence = %d, want 80 (untouched by Process)", servers[0].Confidence)
+	}
+	if servers[0].Project != nil {
+		t.Errorf("docker server project = %+v, want nil", servers[0].Project)
+	}
+}
+
+func TestProcess_EmptyCwdScoresWithoutProject(t *testing.T) {
+	cfg := config.Config{DevRoots: []string{}, ConfidenceThreshold: 50}
+	servers := []model.Server{
+		{Source: model.SourceProcess, Cwd: "", Cmdline: "gunicorn app:app"},
+	}
+	Process(servers, cfg)
+	// gunicorn matches devCmdHints, so score should be 20
+	if servers[0].Confidence != 20 {
+		t.Errorf("empty-cwd confidence = %d, want 20 (dev-cmd scored without project)", servers[0].Confidence)
+	}
+	if servers[0].Project != nil {
+		t.Errorf("empty-cwd project = %+v, want nil (no cwd to resolve)", servers[0].Project)
+	}
+}
+
+func TestProcess_NativeWithCwdGetsProjectAndScore(t *testing.T) {
+	dir := t.TempDir()
+	// Set up a fake project root: .git + package.json with a name.
+	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	pkg := filepath.Join(dir, "package.json")
+	if err := os.WriteFile(pkg, []byte(`{"name": "test-app", "description": "a test project"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Config{DevRoots: []string{dir}, ConfidenceThreshold: 50}
+	servers := []model.Server{
+		{Source: model.SourceProcess, Cwd: dir, Cmdline: "node .../vite"},
+	}
+	Process(servers, cfg)
+	if servers[0].Project == nil {
+		t.Fatal("native server with cwd should get a project, got nil")
+	}
+	if servers[0].Project.Name != "test-app" {
+		t.Errorf("project name = %q, want %q", servers[0].Project.Name, "test-app")
+	}
+	// dev root (50) + repo marker (30) + vite dev cmd (20) = 100, capped
+	if servers[0].Confidence != 100 {
+		t.Errorf("confidence = %d, want 100", servers[0].Confidence)
+	}
+}
+
+func TestProcess_NativeOutsideDevRootStillGetsProject(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	pkg := filepath.Join(dir, "package.json")
+	if err := os.WriteFile(pkg, []byte(`{"name": "other-app"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Config{DevRoots: []string{}, ConfidenceThreshold: 50}
+	servers := []model.Server{
+		{Source: model.SourceProcess, Cwd: dir, Cmdline: "sshd"},
+	}
+	Process(servers, cfg)
+	if servers[0].Project == nil {
+		t.Fatal("cwd should resolve a project even outside dev roots")
+	}
+	if servers[0].Project.Name != "other-app" {
+		t.Errorf("project name = %q, want %q", servers[0].Project.Name, "other-app")
+	}
+	// repo marker (30) + no dev root + no dev cmd = 30
+	if servers[0].Confidence != 30 {
+		t.Errorf("confidence = %d, want 30 (repo only, outside dev root, boring cmd)", servers[0].Confidence)
 	}
 }

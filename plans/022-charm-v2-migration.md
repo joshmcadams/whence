@@ -5,7 +5,7 @@
 > update this plan's status row in `plans/README.md` — unless a reviewer told
 > you they maintain the index.
 >
-> **Drift check (run first)**: `git diff --stat caec51a..HEAD -- internal/tui internal/cli/tui.go go.mod`
+> **Drift check (run first)**: `git diff --stat bc713ee..HEAD -- internal/tui internal/cli/tui.go go.mod`
 > This plan runs LAST among the TUI plans (009, 013, 014, 017, 019 first) —
 > verify their status rows before starting; migrating under them wastes both
 > efforts.

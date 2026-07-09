@@ -14,7 +14,7 @@
 - **Risk**: LOW-MED (interactive child process; Windows is the least-exercised platform)
 - **Depends on**: none
 - **Category**: direction
-- **Planned at**: commit `caec51a`, 2026-07-09
+- **Planned at**: commit `bc713ee`, 2026-07-09
 
 ## Why this matters
 

@@ -106,23 +106,28 @@ func TestConfirmCancel(t *testing.T) {
 }
 
 func TestConfirmPreviewsBlastRadius(t *testing.T) {
-	m := step(newLoaded(), key("x"))
+	m := newLoaded()
+	m.previewBoth = func(s pm.Server, _ kill.Opts) (kill.Plan, kill.Plan) {
+		return kill.Plan{Tree: []kill.TreeMember{{PID: 100, Name: "node"}}},
+			kill.Plan{Tree: []kill.TreeMember{{PID: 100, Name: "node"}}}
+	}
+	m = step(m, key("x"))
 	if m.mode != modeConfirm {
 		t.Fatalf("mode = %v, want modeConfirm after x", m.mode)
 	}
 	// The confirm must be backed by the same plan the kill will act on, so it
 	// can't understate what dies (the safety property the CLI already has).
-	if len(m.plan.Tree) == 0 {
-		t.Fatal("plan.Tree is empty — confirmation would hide the blast radius")
+	if len(m.planTree.Tree) == 0 {
+		t.Fatal("planTree.Tree is empty — confirmation would hide the blast radius")
 	}
 	found := false
-	for _, tm := range m.plan.Tree {
+	for _, tm := range m.planTree.Tree {
 		if tm.PID == 100 { // the selected listener
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("selected listener pid 100 not in previewed tree %+v", m.plan.Tree)
+		t.Errorf("selected listener pid 100 not in previewed tree %+v", m.planTree.Tree)
 	}
 	if !strings.Contains(m.View(), "100") {
 		t.Error("confirm view does not render the pid; blast radius not shown to the user")
@@ -130,7 +135,12 @@ func TestConfirmPreviewsBlastRadius(t *testing.T) {
 }
 
 func TestConfirmSingleToggle(t *testing.T) {
-	m := step(newLoaded(), key("x"))
+	m := newLoaded()
+	m.previewBoth = func(s pm.Server, _ kill.Opts) (kill.Plan, kill.Plan) {
+		return kill.Plan{Tree: []kill.TreeMember{{PID: 1, Name: "root"}, {PID: 100, Name: "node"}}},
+			kill.Plan{Tree: []kill.TreeMember{{PID: 100, Name: "node"}}}
+	}
+	m = step(m, key("x"))
 	if m.killSingle {
 		t.Fatal("kill should default to the whole tree, not single")
 	}
@@ -138,8 +148,8 @@ func TestConfirmSingleToggle(t *testing.T) {
 	if !m.killSingle {
 		t.Error("'s' in the confirm should toggle to listener-only")
 	}
-	if m.mode != modeConfirm || len(m.plan.Tree) == 0 {
-		t.Errorf("after toggle: mode=%v treelen=%d, want still confirming with a tree", m.mode, len(m.plan.Tree))
+	if m.mode != modeConfirm || len(m.currentPlan().Tree) == 0 {
+		t.Errorf("after toggle: mode=%v treelen=%d, want still confirming with a tree", m.mode, len(m.currentPlan().Tree))
 	}
 }
 
@@ -403,5 +413,88 @@ func TestManualRefreshAlwaysLoads(t *testing.T) {
 	m = step(m, key("r"))
 	if m.loadSeq != before+1 {
 		t.Errorf("loadSeq = %d, want %d ('r' must load even while m.loading)", m.loadSeq, before+1)
+	}
+}
+
+// --- PreviewBoth seam tests -------------------------------------------------
+
+func TestConfirmUsesPreviewBothSeam(t *testing.T) {
+	m := newLoaded()
+	var capturedPM pm.Server
+	var calls int
+	m.previewBoth = func(s pm.Server, _ kill.Opts) (kill.Plan, kill.Plan) {
+		capturedPM = s
+		calls++
+		return kill.Plan{Tree: []kill.TreeMember{{PID: 1, Name: "root"}, {PID: 2, Name: "make"}, {PID: 3, Name: "node"}}},
+			kill.Plan{Tree: []kill.TreeMember{{PID: 3, Name: "node"}}}
+	}
+	m = step(m, key("x"))
+
+	if m.mode != modeConfirm {
+		t.Fatalf("mode = %v, want modeConfirm", m.mode)
+	}
+	if capturedPM.Port != 5173 {
+		t.Errorf("previewBoth called with %+v, want server on 5173", capturedPM)
+	}
+	if calls != 1 {
+		t.Errorf("previewBoth called %d times, want exactly 1", calls)
+	}
+	// Default scope: whole tree
+	if len(m.planTree.Tree) != 3 || len(m.planSingle.Tree) != 1 {
+		t.Fatalf("planTree=%d planSingle=%d, want 3 and 1", len(m.planTree.Tree), len(m.planSingle.Tree))
+	}
+	if m.killSingle {
+		t.Error("killSingle should default to false (whole tree)")
+	}
+
+	// Toggle scope with 's' — must re-render without calling previewBoth again.
+	beforeView := m.View()
+	m = step(m, key("s"))
+	if !m.killSingle {
+		t.Error("killSingle should be true after 's' toggle")
+	}
+	if calls != 1 {
+		t.Errorf("previewBoth called %d times after toggle, want still 1 (no re-snapshot)", calls)
+	}
+	afterView := m.View()
+	// Whole-tree view must contain all three PIDs; single-tree only the listener.
+	if !strings.Contains(beforeView, "1") || !strings.Contains(beforeView, "2") || !strings.Contains(beforeView, "3") {
+		t.Errorf("whole-tree view should show all pids:\n%s", beforeView)
+	}
+	if !strings.Contains(afterView, "listener only") {
+		t.Errorf("single-tree view should show 'listener only':\n%s", afterView)
+	}
+
+	// Toggle back — still 1 call.
+	m = step(m, key("s"))
+	if m.killSingle {
+		t.Error("killSingle should be false after toggling back")
+	}
+	if calls != 1 {
+		t.Errorf("previewBoth called %d times after second toggle, want still 1", calls)
+	}
+}
+
+func TestConfirmPreviewBothDockerShortCircuits(t *testing.T) {
+	m := newLoadedDocker()
+	var calls int
+	m.previewBoth = func(s pm.Server, _ kill.Opts) (kill.Plan, kill.Plan) {
+		calls++
+		return kill.Plan{Server: s, Docker: true}, kill.Plan{Server: s, Docker: true}
+	}
+	m = step(m, key("x"))
+
+	if calls != 1 {
+		t.Errorf("previewBoth called %d times, want 1", calls)
+	}
+	if !m.planTree.Docker || !m.planSingle.Docker {
+		t.Error("both plans should be docker plans")
+	}
+
+	// Scoping is not togglable for docker, so planTree == planSingle
+	// and confirmView should not show the scope toggle.
+	v := m.View()
+	if strings.Contains(v, "s to toggle") {
+		t.Error("docker confirm should not offer scope toggle")
 	}
 }

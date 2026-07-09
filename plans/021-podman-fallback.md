@@ -5,7 +5,7 @@
 > update this plan's status row in `plans/README.md` — unless a reviewer told
 > you they maintain the index.
 >
-> **Drift check (run first)**: `git diff --stat caec51a..HEAD -- internal/docker internal/kill/kill.go internal/cli/doctor.go README.md AGENTS.md backlog`
+> **Drift check (run first)**: `git diff --stat bc713ee..HEAD -- internal/docker internal/kill/kill.go internal/cli/doctor.go README.md AGENTS.md backlog`
 > Plans 006 and 010 must be DONE (both reshape `internal/docker/docker.go`;
 > this plan builds on the seams and guards they added).
 >

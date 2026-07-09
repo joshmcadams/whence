@@ -16,7 +16,7 @@
 - **Risk**: LOW (deletions of verified-unused code + mechanical moves)
 - **Depends on**: plans/013-remaining-test-seams.md
 - **Category**: tech-debt
-- **Planned at**: commit `caec51a`, 2026-07-09
+- **Planned at**: commit `bc713ee`, 2026-07-09
 
 ## Why this matters
 

@@ -5,7 +5,7 @@
 > update this plan's status row in `plans/README.md` — unless a reviewer told
 > you they maintain the index.
 >
-> **Drift check (run first)**: `git diff --stat caec51a..HEAD -- internal/tui internal/kill/kill.go internal/classify internal/cli/collect.go internal/cli/list.go internal/cli/config.go`
+> **Drift check (run first)**: `git diff --stat bc713ee..HEAD -- internal/tui internal/kill/kill.go internal/classify internal/cli/collect.go internal/cli/list.go internal/cli/config.go`
 > Plan 001 must be DONE (this plan extends its seam pattern). Plans 003/009
 > may have edited `tui.go` — reconcile excerpts before proceeding.
 
@@ -16,7 +16,8 @@
 - **Risk**: LOW-MED (one small public API addition to `internal/kill`; the rest is seams + tests)
 - **Depends on**: plans/001-kill-path-characterization-tests.md
 - **Category**: tests (+ one perf fix that falls out naturally)
-- **Planned at**: commit `caec51a`, 2026-07-09
+- **Planned at**: commit `bc713ee`, 2026-07-09
+- **Executed at**: commit `bc713ee`, 2026-07-09
 
 ## Why this matters
 
