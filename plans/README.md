@@ -27,7 +27,7 @@ Repo ground rules that apply to EVERY plan (from `AGENTS.md`):
 | 006 | Inventory merge correctness + docker JSON contract tests | P1 | M | — | DONE |
 | 007 | Toolchain/CI cluster: go directive, pinned lint, gofmt enforcement, govulncheck | P1 | S | — | DONE |
 | 008 | Reconcile stale docs: backlog, DESIGN.md, README, phase comments, kill-climb caveat | P2 | S | 007 | DONE |
-| 009 | TUI refresh integrity: in-flight guard + snapshot generation counter | P2 | S | — | TODO |
+| 009 | TUI refresh integrity: in-flight guard + snapshot generation counter | P2 | S | — | DONE |
 | 010 | Harden attribution inputs: bounded file reads, compose workdir validation, `--` separators | P2 | S | — | TODO |
 | 011 | Release pipeline hardening: CI permissions, SHA-pinned actions, reproducible releases | P2 | S | — | TODO |
 | 012 | Stable sorts and `--watch` input validation | P2 | S | — | TODO |
@@ -227,6 +227,29 @@ in different packages and don't conflict. Everything touching `internal/tui/tui.
   climb correctly stops at the interposed shell). One harmless leftover
   scratch file from the executor's own verification experiment was found
   and cleaned up in review — no repo or process impact.
+
+- **009 — DONE.** Only unrelated drift (plan 003's `output.Sanitize` call
+  inside `killedMsg`'s error branch, orthogonal to this plan's job), no
+  reconciliation needed beyond a heads-up note to the executor. Executed in
+  worktree branch `worktree-agent-a1142aab52da2fd27` (commit branch
+  `advisor/009-tui-refresh-guard`), reviewed and approved 2026-07-09. Added
+  `loadSeq`/`appliedSeq`/`loading` to `Model` and a `nextLoadCmd()` helper;
+  `tickMsg` now skips issuing a load while one is in flight; `Init`/
+  `killedMsg`/`r` all route through the stamped mechanism so stale collects
+  can't roll the view back. Reviewer traced the full state machine by hand
+  (initial load, tick-while-loading, tick-while-idle, stale-drop, and the
+  subtler "older-but-newest-applied while a newer request is outstanding"
+  case) rather than relying on tests alone, and independently verified both
+  of the executor's judgment calls: `appliedSeq: -1` (necessary so the
+  zero-valued first `loadedMsg{seq:0}` isn't wrongly dropped — confirmed by
+  tracing `newLoaded()`'s test helper, which is also why every pre-existing
+  test passes unmodified) and `Init`'s hand-stamped seq-0 load (necessary
+  since `tea.Model.Init() tea.Cmd` can't mutate the model; `New()` pre-seeds
+  `loading: true` to cover it, and no seq-collision is possible since
+  `nextLoadCmd` always increments from the model's current `loadSeq`, which
+  `Init` never touches). Three uncached re-runs (25/25 tests passing, up
+  from 20), full lint/test gate, and `git status` cleanliness all
+  independently confirmed.
 
 ## Findings considered and rejected (do not re-audit)
 
