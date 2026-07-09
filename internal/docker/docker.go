@@ -178,7 +178,7 @@ func hostPorts(c inspect) []portMap {
 }
 
 func isAllInterfacesIP(ip string) bool {
-	return ip == "" || ip == "0.0.0.0" || ip == "::"
+	return model.IsAllInterfaces(ip)
 }
 
 func runningIDs() ([]string, error) {

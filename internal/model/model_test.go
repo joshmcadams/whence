@@ -42,6 +42,7 @@ func TestExposure(t *testing.T) {
 		{"0.0.0.0", "all"},
 		{"::", "all"},
 		{"", "all"},
+		{"*", "all"}, // lsof/darwin wildcard bind
 		{"192.168.1.5", "192.168.1.5"},
 		{"10.0.0.1", "10.0.0.1"},
 	}
@@ -49,6 +50,48 @@ func TestExposure(t *testing.T) {
 		s := Server{Address: tc.addr}
 		if got := s.Exposure(); got != tc.want {
 			t.Errorf("Exposure(%q) = %q, want %q", tc.addr, got, tc.want)
+		}
+	}
+}
+
+func TestIsAllInterfaces(t *testing.T) {
+	cases := []struct {
+		addr string
+		want bool
+	}{
+		{"", true},
+		{"0.0.0.0", true},
+		{"::", true},
+		{"*", true},
+		{"127.0.0.1", false},
+		{"::1", false},
+		{"localhost", false},
+		{"192.168.1.5", false},
+	}
+	for _, tc := range cases {
+		if got := IsAllInterfaces(tc.addr); got != tc.want {
+			t.Errorf("IsAllInterfaces(%q) = %v, want %v", tc.addr, got, tc.want)
+		}
+	}
+}
+
+func TestIsLoopback(t *testing.T) {
+	cases := []struct {
+		addr string
+		want bool
+	}{
+		{"127.0.0.1", true},
+		{"::1", true},
+		{"localhost", true},
+		{"", false},
+		{"0.0.0.0", false},
+		{"::", false},
+		{"*", false},
+		{"192.168.1.5", false},
+	}
+	for _, tc := range cases {
+		if got := IsLoopback(tc.addr); got != tc.want {
+			t.Errorf("IsLoopback(%q) = %v, want %v", tc.addr, got, tc.want)
 		}
 	}
 }
