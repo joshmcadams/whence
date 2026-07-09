@@ -57,6 +57,28 @@ func TestRun_PropagatesCommandError(t *testing.T) {
 	}
 }
 
+func TestInteractive_Success(t *testing.T) {
+	skipIfNoShellCmds(t)
+	if err := Interactive("true"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestInteractive_CommandError(t *testing.T) {
+	skipIfNoShellCmds(t)
+	err := Interactive("false")
+	if err == nil {
+		t.Fatal("expected a non-zero exit error")
+	}
+}
+
+func TestInteractive_NotFound(t *testing.T) {
+	err := Interactive("definitely-not-a-binary-xyz")
+	if err == nil {
+		t.Fatal("expected an error for a missing binary")
+	}
+}
+
 func TestCombinedOutput_CapturesStderr(t *testing.T) {
 	skipIfNoShellCmds(t)
 	// Write to stderr via sh; CombinedOutput must capture it.

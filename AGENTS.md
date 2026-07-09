@@ -85,7 +85,9 @@ nothing below `inventory` should import `cli`, `tui`, or `inventory`.
   wedged dependency times out instead of hanging `whence`. A real non-zero exit
   passes through unchanged; only a deadline becomes a `timed out` error. The one
   allowed direct `os/exec` use is `exec.LookPath` for availability checks (no
-  child process is spawned).
+  child process is spawned). `execx.Interactive` is the sanctioned form for
+  user-launched interactive children (no timeout, inherited stdio) — everything
+  else keeps the timeout rule.
 - **Cross-platform code is build-tagged, one file per OS** (`cwd_linux.go`,
   `cwd_darwin.go`, `cwd_windows.go`, `signal_unix.go`, `signal_windows.go`). Add
   platform behavior by adding/editing these, never with `runtime.GOOS`

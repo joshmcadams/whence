@@ -83,6 +83,7 @@ whence tui --all            # start the TUI showing all ports, not just yours
 whence doctor               # platform capabilities & diagnostics
 whence config               # show effective config
 whence config --init        # write a default config file
+whence config --edit        # open in $EDITOR
 ```
 
 ### TUI keys

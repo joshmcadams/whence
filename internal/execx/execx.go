@@ -9,6 +9,7 @@ package execx
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"time"
 )
@@ -29,6 +30,19 @@ func CombinedOutput(timeout time.Duration, name string, args ...string) ([]byte,
 	defer cancel()
 	out, err := exec.CommandContext(ctx, name, args...).CombinedOutput()
 	return out, wrap(ctx, name, timeout, err)
+}
+
+// Interactive runs a command wired to the caller's terminal (stdin/stdout/
+// stderr inherited) and waits for it to exit. Unlike Output/CombinedOutput
+// there is deliberately NO timeout: the child is an interactive program
+// (e.g. $EDITOR) whose lifetime the user controls. Use only for
+// user-launched interactive children.
+func Interactive(name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 // Run executes name+args with a hard timeout, discarding output.
