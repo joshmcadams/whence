@@ -19,7 +19,7 @@ Repo ground rules that apply to EVERY plan (from `AGENTS.md`):
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 001 | Characterization tests for the kill execution path | P1 | M | — | TODO |
+| 001 | Characterization tests for the kill execution path | P1 | M | — | DONE (see note) |
 | 002 | Harden kill targeting: identity re-check, cycle guards, zombie-aware liveness | P1 | M | 001 | TODO |
 | 003 | Sanitize untrusted strings at every terminal render boundary | P1 | S | — | TODO |
 | 004 | Recognize `.git` files (worktrees/submodules) in project root detection | P1 | S | — | TODO |
@@ -72,6 +72,29 @@ Plans marked P1 with no mutual dependencies (003, 004, 005, 006, 007) can run in
 parallel with 001/002 **only in separate worktrees**; 005 and 006 both add tests
 in different packages and don't conflict. Everything touching `internal/tui/tui.go`
 (003, 009, 013, 014, 017, 019, 022) must be serialized in index order.
+
+## Execution notes
+
+- **001 — DONE, with the `internal/cli` coverage target corrected.** Executed
+  in worktree branch `worktree-agent-a26241288055ae975`, reviewed and
+  approved 2026-07-09. `internal/kill` coverage: 21.4% → 95.7% (target ≥70%,
+  met). `internal/tui` coverage rose to 79.8% as a side effect. `internal/cli`
+  landed at 40.2%, short of the ≥45% this plan originally specified — verified
+  independently: the target was miscalibrated against actual file sizes.
+  `kill.go` (the only in-scope file in that package) is itself at ~96%+ except
+  the deliberately-untested thin `runKill` wrapper; the remaining 0%-coverage
+  code (`list.go`, `doctor.go`, `config.go`, `root.go`, `tui.go`, `collect.go`)
+  is out of scope for this plan by design (`collect.go` becomes a seam only in
+  plan 013). Closing the gap would require violating scope or the plan's own
+  hermeticity rule. The executor correctly declined to do either — it had
+  drafted one non-hermetic test that touched real config/process state to
+  nudge the number, recognized the conflict with this plan's own maintenance
+  note, and removed it in a follow-up commit rather than keep it. No
+  user-visible string changed (`git diff caec51a..HEAD` shows only
+  `Printf→Fprintf` plumbing and the `execx.CombinedOutput→dockerCombinedOutput`
+  seam rename); no files outside the in-scope list were touched; `make lint`
+  and `make test` pass; three uncached re-runs of the affected packages showed
+  no flakiness. Plan 002 may now proceed — its safety net is in place.
 
 ## Findings considered and rejected (do not re-audit)
 
