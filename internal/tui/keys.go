@@ -3,10 +3,10 @@ package tui
 import bkey "github.com/charmbracelet/bubbles/key"
 
 type keyMap struct {
-	Up, Down              bkey.Binding
-	Kill, Detail, Filter  bkey.Binding
-	All, Theme, Refresh   bkey.Binding
-	Quit                  bkey.Binding
+	Up, Down             bkey.Binding
+	Kill, Detail, Filter bkey.Binding
+	All, Theme, Refresh  bkey.Binding
+	Quit                 bkey.Binding
 
 	ConfirmYes, ConfirmScope bkey.Binding
 	ConfirmCancel            bkey.Binding
