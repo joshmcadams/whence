@@ -154,6 +154,7 @@ func (p Plan) Lines() []string {
 
 // errNoPID is returned when a native server has no accessible pid.
 var errNoPID = errors.New("no accessible pid (owned by another user; try elevated privileges)")
+
 // Shells (bash/zsh/sh/fish/pwsh/cmd) are deliberately absent: climbing stops at
 // them so an interactive session is never killed.
 //

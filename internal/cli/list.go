@@ -126,13 +126,3 @@ func watchList(cfg config.Config, o *listOpts) error {
 		time.Sleep(o.interval)
 	}
 }
-
-func filter(in []model.Server, keep func(model.Server) bool) []model.Server {
-	out := in[:0:0]
-	for _, s := range in {
-		if keep(s) {
-			out = append(out, s)
-		}
-	}
-	return out
-}
