@@ -231,6 +231,27 @@ func TestHintAbsentWhenQueryFilters(t *testing.T) {
 	}
 }
 
+// TestRebuildSanitizesRowContent guards against a server description or name
+// embedding a terminal escape (from a repo's package.json / README / process
+// name) rewriting the table. Note the full View() also contains lipgloss
+// styling escapes, so this asserts on the rebuilt row cell strings, not the
+// rendered View.
+func TestRebuildSanitizesRowContent(t *testing.T) {
+	m := New(config.Config{ConfidenceThreshold: 50}, false)
+	m = step(m, tea.WindowSizeMsg{Width: 100, Height: 24})
+	m = step(m, loadedMsg{servers: []pm.Server{
+		{Port: 5173, Proto: "tcp", PID: 100, Source: pm.SourceProcess, Confidence: 100,
+			Project: &pm.Project{Name: "evil\x1b[8mname", Description: "desc\x1b]0;pwn\x07"}},
+	}})
+	for _, row := range m.table.Rows() {
+		for _, cell := range row {
+			if strings.ContainsRune(cell, 0x1b) {
+				t.Errorf("row cell contains raw ESC: %q", cell)
+			}
+		}
+	}
+}
+
 func TestFilterNarrows(t *testing.T) {
 	m := step(newLoaded(), key("/"))
 	if m.mode != modeFilter {

@@ -297,6 +297,31 @@ type assertErr string
 
 func (e assertErr) Error() string { return string(e) }
 
+// TestRunKillWith_SanitizesEscapeSequences guards against a container/process
+// name embedding a terminal escape (e.g. an ANSI cursor move) rewriting the
+// confirmation prompt or status lines. describe/printPlan must neutralize it
+// before it reaches d.out.
+func TestRunKillWith_SanitizesEscapeSequences(t *testing.T) {
+	var out, errOut bytes.Buffer
+	killFn, _ := fakeKill(nil)
+	d := killDeps{
+		servers: []model.Server{{Port: 3000, Source: model.SourceDocker, Name: "web\x1b[1Ahack"}},
+		kill:    killFn,
+		in:      strings.NewReader("y\n"),
+		out:     &out,
+		errOut:  &errOut,
+	}
+	if err := runKillWith("3000", &killOpts{}, d); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.ContainsRune(out.String(), 0x1b) {
+		t.Errorf("output contains raw ESC from server name:\n%q", out.String())
+	}
+	if !strings.Contains(out.String(), "web") || !strings.Contains(out.String(), "hack") {
+		t.Errorf("sanitized output should still contain the harmless parts of the name: %q", out.String())
+	}
+}
+
 func TestNewKillCmd_WiresFlags(t *testing.T) {
 	cmd := newKillCmd()
 	if cmd.Use != "kill <port|name>" {

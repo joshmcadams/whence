@@ -173,7 +173,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case killedMsg:
 		if msg.res.Err != nil {
-			m.status = errStyle.Render("✗ " + describe(msg.res.Server) + " — " + msg.res.Err.Error())
+			m.status = errStyle.Render("✗ " + describe(msg.res.Server) + " — " + output.Sanitize(msg.res.Err.Error()))
 		} else {
 			m.status = okStyle.Render("✓ killed " + describe(msg.res.Server))
 		}
@@ -313,17 +313,17 @@ func (m *Model) rebuild() {
 	descW := descWidth(m.width)
 	rows := make([]table.Row, len(m.rows))
 	for i, s := range m.rows {
-		name := s.DisplayName()
+		name := output.Sanitize(s.DisplayName())
 		if s.Exposure() == "all" {
 			name += " [!]"
 		}
 		rows[i] = table.Row{
 			fmt.Sprintf("%d", s.Port),
-			s.Proto,
+			output.Sanitize(s.Proto),
 			output.HumanUptime(s.Uptime),
 			output.SrcLabel(s.Source),
 			name,
-			output.Truncate(s.Description(), descW),
+			output.Truncate(output.Sanitize(s.Description()), descW),
 		}
 	}
 	m.table.SetRows(rows)
@@ -366,7 +366,7 @@ func (m Model) headerView() string {
 		meta += dimStyle.Render(" · /" + m.query)
 	}
 	if m.err != nil {
-		meta += errStyle.Render("  scan error: " + m.err.Error())
+		meta += errStyle.Render("  scan error: " + output.Sanitize(m.err.Error()))
 	}
 	return title + meta
 }
@@ -404,7 +404,7 @@ func (m Model) confirmView() string {
 		shown = shown[:maxConfirmTreeLines]
 	}
 	for _, line := range shown {
-		b.WriteString("  " + dimStyle.Render(line) + "\n")
+		b.WriteString("  " + dimStyle.Render(output.Sanitize(line)) + "\n")
 	}
 	if len(lines) > len(shown) {
 		b.WriteString("  " + dimStyle.Render(fmt.Sprintf("… +%d more", len(lines)-len(shown))) + "\n")
@@ -432,27 +432,27 @@ func (m Model) detailView() string {
 	}
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("whence — detail") + "\n\n")
-	b.WriteString(row("Port", fmt.Sprintf("%d/%s", s.Port, s.Proto)) + "\n")
+	b.WriteString(row("Port", fmt.Sprintf("%d/%s", s.Port, output.Sanitize(s.Proto))) + "\n")
 	b.WriteString(row("Bind", s.Exposure()) + "\n")
-	b.WriteString(row("Server", s.DisplayName()) + "\n")
+	b.WriteString(row("Server", output.Sanitize(s.DisplayName())) + "\n")
 	b.WriteString(row("Source", output.SrcLabel(s.Source)) + "\n")
 	if s.Source == pm.SourceDocker {
-		b.WriteString(row("Container", s.Name) + "\n")
-		b.WriteString(row("Image", s.Cmdline) + "\n")
+		b.WriteString(row("Container", output.Sanitize(s.Name)) + "\n")
+		b.WriteString(row("Image", output.Sanitize(s.Cmdline)) + "\n")
 	} else {
 		b.WriteString(row("PID", fmt.Sprintf("%d (ppid %d)", s.PID, s.PPID)) + "\n")
-		b.WriteString(row("Exe", s.Exe) + "\n")
-		b.WriteString(row("Command", s.Cmdline) + "\n")
-		b.WriteString(row("Cwd", s.Cwd) + "\n")
+		b.WriteString(row("Exe", output.Sanitize(s.Exe)) + "\n")
+		b.WriteString(row("Command", output.Sanitize(s.Cmdline)) + "\n")
+		b.WriteString(row("Cwd", output.Sanitize(s.Cwd)) + "\n")
 	}
 	b.WriteString(row("Uptime", output.HumanUptime(s.Uptime)) + "\n")
 	b.WriteString(row("Confidence", fmt.Sprintf("%d", s.Confidence)) + "\n")
 	if s.Project != nil {
-		b.WriteString(row("Repo", s.Project.Root) + "\n")
-		b.WriteString(row("Marker", s.Project.Marker) + "\n")
+		b.WriteString(row("Repo", output.Sanitize(s.Project.Root)) + "\n")
+		b.WriteString(row("Marker", output.Sanitize(s.Project.Marker)) + "\n")
 	}
 	b.WriteString("\n" + detailLabel.Render("Description") + "\n")
-	b.WriteString(wordWrap(s.Description(), 72) + "\n")
+	b.WriteString(wordWrap(output.Sanitize(s.Description()), 72) + "\n")
 	b.WriteString("\n" + dimStyle.Render("esc back · q list"))
 	return b.String()
 }
@@ -483,8 +483,11 @@ func descWidth(width int) int {
 	return d
 }
 
+// describe renders a server for a status/confirmation line. name comes from
+// scan/docker/project data and can embed process-controlled text, so it's
+// sanitized here — every caller gets a terminal-safe string.
 func describe(s pm.Server) string {
-	name := s.DisplayName()
+	name := output.Sanitize(s.DisplayName())
 	if name == "" {
 		name = "(unknown)"
 	}
