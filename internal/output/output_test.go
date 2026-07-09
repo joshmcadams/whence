@@ -105,7 +105,7 @@ func TestRow(t *testing.T) {
 		{
 			name: "unattributed row with note", s: model.Server{Port: 9999, Proto: "tcp", Source: model.SourceProcess,
 				Address: "127.0.0.1",
-				Notes: []string{"cwd unreadable"}},
+				Notes:   []string{"cwd unreadable"}},
 			w: 60, wPort: "9999", wName: "-", wDesc: "(cwd unreadable)", wPID: "-",
 		},
 		{
@@ -127,7 +127,7 @@ func TestRow(t *testing.T) {
 		{
 			name: "docker row", s: model.Server{Port: 5432, Proto: "tcp", Source: model.SourceDocker,
 				Address: "127.0.0.1",
-				Name: "db-1", Project: &model.Project{Name: "app"}},
+				Name:    "db-1", Project: &model.Project{Name: "app"}},
 			w: 60, wPort: "5432", wName: "app", wPID: "-",
 		},
 	}

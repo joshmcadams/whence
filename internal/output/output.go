@@ -81,13 +81,14 @@ func Describe(s model.Server) string {
 // the columns it needs by index (see the constant list below).
 //
 // Index  Cell
-//   0    PORT       e.g. "5173"
-//   1    PROTO      e.g. "tcp" (sanitized)
-//   2    PID        e.g. "100" or "-" when ≤ 0
-//   3    UPTIME     e.g. "45s" (HumanUptime)
-//   4    SRC        e.g. "proc" / "docker" (SrcLabel)
-//   5    SERVER     DisplayName with " [!]" when Exposure()=="all", "-" when empty
-//   6    DESCRIPTION Truncated to descWidth; falls back to note(s); "-" when empty
+//
+//	0    PORT       e.g. "5173"
+//	1    PROTO      e.g. "tcp" (sanitized)
+//	2    PID        e.g. "100" or "-" when ≤ 0
+//	3    UPTIME     e.g. "45s" (HumanUptime)
+//	4    SRC        e.g. "proc" / "docker" (SrcLabel)
+//	5    SERVER     DisplayName with " [!]" when Exposure()=="all", "-" when empty
+//	6    DESCRIPTION Truncated to descWidth; falls back to note(s); "-" when empty
 func Row(s model.Server, descWidth int) []string {
 	name := Sanitize(s.DisplayName())
 	if name == "" {

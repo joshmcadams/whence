@@ -228,9 +228,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case killedMsg:
 		if msg.res.Err != nil {
-			m.status = errStyle.Render("✗ " + describe(msg.res.Server) + " — " + output.Sanitize(msg.res.Err.Error()))
+			m.status = errStyle.Render("✗ " + output.Describe(msg.res.Server) + " — " + output.Sanitize(msg.res.Err.Error()))
 		} else {
-			m.status = okStyle.Render("✓ killed " + describe(msg.res.Server))
+			m.status = okStyle.Render("✓ killed " + output.Describe(msg.res.Server))
 		}
 		nm, loadC := m.nextLoadCmd()
 		return nm, loadC // refresh immediately
@@ -282,7 +282,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "y", "yes":
 			opts := m.killOpts()
 			m.mode = modeList
-			m.status = "killing " + describe(m.selected) + "…"
+			m.status = "killing " + output.Describe(m.selected) + "…"
 			return m, killCmd(m.selected, opts)
 		case "s":
 			// Toggle whole-tree vs listener-only (native processes only)
@@ -456,7 +456,7 @@ func (m Model) confirmView() string {
 	p := m.currentPlan()
 	var b strings.Builder
 
-	head := "Kill " + describe(m.selected)
+	head := "Kill " + output.Describe(m.selected)
 	if !p.Docker && !p.NoPID && len(p.Tree) > 1 {
 		head += fmt.Sprintf(" — %d processes", len(p.Tree))
 	}
@@ -545,20 +545,6 @@ func descWidth(width int) int {
 		return 80
 	}
 	return d
-}
-
-// describe renders a server for a status/confirmation line. name comes from
-// scan/docker/project data and can embed process-controlled text, so it's
-// sanitized here — every caller gets a terminal-safe string.
-func describe(s pm.Server) string {
-	name := output.Sanitize(s.DisplayName())
-	if name == "" {
-		name = "(unknown)"
-	}
-	if s.Source == pm.SourceDocker {
-		return fmt.Sprintf(":%d %s", s.Port, name)
-	}
-	return fmt.Sprintf(":%d %s (pid %d)", s.Port, name, s.PID)
 }
 
 func wordWrap(s string, width int) string {

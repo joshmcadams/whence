@@ -333,22 +333,3 @@ func TestNewKillCmd_WiresFlags(t *testing.T) {
 		}
 	}
 }
-
-func TestDescribe(t *testing.T) {
-	cases := []struct {
-		name string
-		s    model.Server
-		want string
-	}{
-		{"docker", model.Server{Port: 3000, Source: model.SourceDocker, Name: "web-1"}, ":3000 web-1 [container web-1]"},
-		{"process", model.Server{Port: 4000, Source: model.SourceProcess, PID: 42, Name: "node"}, ":4000 node [pid 42]"},
-		{"unknown name", model.Server{Port: 5000, Source: model.SourceProcess, PID: 7}, ":5000 (unknown) [pid 7]"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := describe(tc.s); got != tc.want {
-				t.Errorf("describe = %q, want %q", got, tc.want)
-			}
-		})
-	}
-}

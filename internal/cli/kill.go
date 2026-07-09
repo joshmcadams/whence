@@ -111,9 +111,9 @@ func runKillWith(target string, o *killOpts, d killDeps) error {
 		res := d.kill(s, opts)
 		if res.Err != nil {
 			failed++
-			fmt.Fprintf(d.out, "✗ %s — %v\n", describe(s), res.Err)
+			fmt.Fprintf(d.out, "✗ %s — %v\n", output.Describe(s), res.Err)
 		} else {
-			fmt.Fprintf(d.out, "✓ killed %s (%s)\n", describe(s), res.Method)
+			fmt.Fprintf(d.out, "✓ killed %s (%s)\n", output.Describe(s), res.Method)
 		}
 	}
 	if failed > 0 {
@@ -213,25 +213,9 @@ func confirmKill(units []model.Server, target string, fuzzy bool, opts kill.Opts
 }
 
 func printPlan(p kill.Plan, out io.Writer) {
-	fmt.Fprintf(out, "  %s\n", describe(p.Server))
+	fmt.Fprintf(out, "  %s\n", output.Describe(p.Server))
 	for _, line := range p.Lines() {
 		fmt.Fprintf(out, "      %s\n", output.Sanitize(line))
-	}
-}
-
-// describe renders a server for a confirmation/status line. The name and
-// container/process identifiers can embed process- or repo-controlled text,
-// so they're sanitized here — every caller gets a terminal-safe string.
-func describe(s model.Server) string {
-	name := output.Sanitize(s.DisplayName())
-	if name == "" {
-		name = "(unknown)"
-	}
-	switch s.Source {
-	case model.SourceDocker:
-		return fmt.Sprintf(":%d %s [container %s]", s.Port, name, output.Sanitize(s.Name))
-	default:
-		return fmt.Sprintf(":%d %s [pid %d]", s.Port, name, s.PID)
 	}
 }
 
