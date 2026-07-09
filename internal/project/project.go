@@ -77,7 +77,7 @@ func findRoot(start string) (root, marker string) {
 	dir := filepath.Clean(start)
 	var firstManifest, firstManifestMarker string
 	for {
-		if isDir(filepath.Join(dir, ".git")) {
+		if exists(filepath.Join(dir, ".git")) {
 			return dir, ".git"
 		}
 		if firstManifest == "" {
@@ -251,5 +251,3 @@ func first(vals ...string) string {
 }
 
 func exists(p string) bool { _, err := os.Stat(p); return err == nil }
-
-func isDir(p string) bool { fi, err := os.Stat(p); return err == nil && fi.IsDir() }
