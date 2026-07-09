@@ -1,12 +1,14 @@
 package tui
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/joshmcadams/whence/internal/config"
+	"github.com/joshmcadams/whence/internal/kill"
 	pm "github.com/joshmcadams/whence/internal/model"
 )
 
@@ -16,6 +18,24 @@ func testServers() []pm.Server {
 			Cwd: "/r", Project: &pm.Project{Name: "jfdid", Description: "task system", Root: "/r"}},
 		{Port: 9999, Proto: "tcp", Source: pm.SourceProcess, Confidence: 0},
 	}
+}
+
+// dockerTestServers returns a single docker-source server. kill.Preview
+// short-circuits to a Docker plan for these without ever touching the real
+// process table (kill.go: Preview returns early when Source == SourceDocker),
+// so the confirm/kill-dispatch tests below stay hermetic.
+func dockerTestServers() []pm.Server {
+	return []pm.Server{
+		{Port: 5432, Proto: "tcp", Source: pm.SourceDocker, Name: "db-1", Confidence: 100,
+			Project: &pm.Project{Name: "app", Description: "database"}},
+	}
+}
+
+func newLoadedDocker() Model {
+	m := New(config.Config{ConfidenceThreshold: 50}, false)
+	m = step(m, tea.WindowSizeMsg{Width: 100, Height: 24})
+	m = step(m, loadedMsg{servers: dockerTestServers()})
+	return m
 }
 
 func newLoaded() Model {
@@ -227,5 +247,49 @@ func TestFilterNarrows(t *testing.T) {
 	m = step(m, key("esc"))
 	if m.mode != modeList || m.query != "" {
 		t.Errorf("esc should clear filter: mode=%v query=%q", m.mode, m.query)
+	}
+}
+
+func TestConfirmYesDispatchesKill(t *testing.T) {
+	m := step(newLoadedDocker(), key("x"))
+	if m.mode != modeConfirm {
+		t.Fatalf("mode = %v, want modeConfirm after x", m.mode)
+	}
+	nm, cmd := m.Update(key("y"))
+	m2 := nm.(Model)
+	if m2.mode != modeList {
+		t.Errorf("mode = %v, want modeList after y", m2.mode)
+	}
+	if !strings.Contains(m2.status, "killing") {
+		t.Errorf("status = %q, want it to mention 'killing'", m2.status)
+	}
+	if cmd == nil {
+		t.Error("expected a non-nil kill command (not executed here)")
+	}
+}
+
+func TestKilledMsgSuccessSetsStatus(t *testing.T) {
+	m := newLoadedDocker()
+	s := dockerTestServers()[0]
+	nm, cmd := m.Update(killedMsg{res: kill.Result{Server: s}})
+	m2 := nm.(Model)
+	if !strings.Contains(m2.status, "✓ killed") {
+		t.Errorf("status = %q, want it to contain '✓ killed'", m2.status)
+	}
+	if cmd == nil {
+		t.Error("expected a non-nil reload command")
+	}
+}
+
+func TestKilledMsgErrorSetsStatus(t *testing.T) {
+	m := newLoadedDocker()
+	s := dockerTestServers()[0]
+	nm, _ := m.Update(killedMsg{res: kill.Result{Server: s, Err: errors.New("nope")}})
+	m2 := nm.(Model)
+	if !strings.Contains(m2.status, "✗") {
+		t.Errorf("status = %q, want it to contain '✗'", m2.status)
+	}
+	if !strings.Contains(m2.status, "nope") {
+		t.Errorf("status = %q, want it to contain the error message 'nope'", m2.status)
 	}
 }

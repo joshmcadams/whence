@@ -3,6 +3,7 @@ package cli
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -43,6 +44,19 @@ func newKillCmd() *cobra.Command {
 	return cmd
 }
 
+// killDeps supplies runKillWith with everything it needs beyond the target and
+// flags: the collected inventory, the kill function, and the I/O streams for
+// the confirmation prompt and progress output. Split out so tests can inject
+// fixtures and buffers instead of the real config/inventory/process table.
+type killDeps struct {
+	cfg     config.Config
+	servers []model.Server
+	kill    func(model.Server, kill.Opts) kill.Result
+	in      io.Reader
+	out     io.Writer
+	errOut  io.Writer
+}
+
 func runKill(target string, o *killOpts) error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -52,8 +66,18 @@ func runKill(target string, o *killOpts) error {
 	if err != nil {
 		return err
 	}
+	return runKillWith(target, o, killDeps{
+		cfg:     cfg,
+		servers: servers,
+		kill:    kill.Server,
+		in:      os.Stdin,
+		out:     os.Stdout,
+		errOut:  os.Stderr,
+	})
+}
 
-	matches, fuzzy := matchTargets(servers, target)
+func runKillWith(target string, o *killOpts, d killDeps) error {
+	matches, fuzzy := matchTargets(d.servers, target)
 	if len(matches) == 0 {
 		return fmt.Errorf("no server found matching %q", target)
 	}
@@ -63,32 +87,32 @@ func runKill(target string, o *killOpts) error {
 	// is killed by PID alone, leaving the rest of its process tree running.
 	if o.single && len(units) > 1 {
 		if port, err := strconv.Atoi(target); err != nil || port <= 0 {
-			fmt.Fprintf(os.Stderr, "note: --single with %d matched targets kills only each listener pid, not its tree\n", len(units))
+			fmt.Fprintf(d.errOut, "note: --single with %d matched targets kills only each listener pid, not its tree\n", len(units))
 		}
 	}
 
 	timeout := o.timeout
 	if timeout <= 0 {
-		timeout = time.Duration(cfg.KillTimeoutSeconds) * time.Second
+		timeout = time.Duration(d.cfg.KillTimeoutSeconds) * time.Second
 	}
 	opts := kill.Opts{Timeout: timeout, Single: o.single}
 
 	// Confirm unless forced, previewing the full tree each kill will signal.
 	if !o.force {
-		if !confirmKill(units, target, fuzzy, opts) {
-			fmt.Println("Aborted.")
+		if !confirmKill(units, target, fuzzy, opts, d.out, d.in) {
+			fmt.Fprintln(d.out, "Aborted.")
 			return nil
 		}
 	}
 
 	var failed int
 	for _, s := range units {
-		res := kill.Server(s, opts)
+		res := d.kill(s, opts)
 		if res.Err != nil {
 			failed++
-			fmt.Printf("✗ %s — %v\n", describe(s), res.Err)
+			fmt.Fprintf(d.out, "✗ %s — %v\n", describe(s), res.Err)
 		} else {
-			fmt.Printf("✓ killed %s (%s)\n", describe(s), res.Method)
+			fmt.Fprintf(d.out, "✓ killed %s (%s)\n", describe(s), res.Method)
 		}
 	}
 	if failed > 0 {
@@ -165,7 +189,7 @@ func dedupeUnits(servers []model.Server) []model.Server {
 // the listening pid — then asks for confirmation. Because a kill climbs to a
 // launcher and takes the whole subtree, one listening server can mean several
 // processes; the user sees them all before agreeing.
-func confirmKill(units []model.Server, target string, fuzzy bool, opts kill.Opts) bool {
+func confirmKill(units []model.Server, target string, fuzzy bool, opts kill.Opts, out io.Writer, in io.Reader) bool {
 	plans := kill.PreviewBatch(units, opts)
 	totalProcs := 0
 	for _, p := range plans {
@@ -173,24 +197,24 @@ func confirmKill(units []model.Server, target string, fuzzy bool, opts kill.Opts
 	}
 
 	if fuzzy {
-		fmt.Printf("No exact match for %q; %d server(s) contain it", target, len(units))
+		fmt.Fprintf(out, "No exact match for %q; %d server(s) contain it", target, len(units))
 	} else {
-		fmt.Printf("About to kill %d target(s) matching %q", len(units), target)
+		fmt.Fprintf(out, "About to kill %d target(s) matching %q", len(units), target)
 	}
 	if totalProcs > 0 {
-		fmt.Printf(" — %d process(es) total", totalProcs)
+		fmt.Fprintf(out, " — %d process(es) total", totalProcs)
 	}
-	fmt.Println(":")
+	fmt.Fprintln(out, ":")
 	for _, p := range plans {
-		printPlan(p)
+		printPlan(p, out)
 	}
-	return confirm("Proceed? [y/N] ")
+	return confirm("Proceed? [y/N] ", out, in)
 }
 
-func printPlan(p kill.Plan) {
-	fmt.Printf("  %s\n", describe(p.Server))
+func printPlan(p kill.Plan, out io.Writer) {
+	fmt.Fprintf(out, "  %s\n", describe(p.Server))
 	for _, line := range p.Lines() {
-		fmt.Printf("      %s\n", line)
+		fmt.Fprintf(out, "      %s\n", line)
 	}
 }
 
@@ -207,9 +231,9 @@ func describe(s model.Server) string {
 	}
 }
 
-func confirm(prompt string) bool {
-	fmt.Print(prompt)
-	r := bufio.NewReader(os.Stdin)
+func confirm(prompt string, out io.Writer, in io.Reader) bool {
+	fmt.Fprint(out, prompt)
+	r := bufio.NewReader(in)
 	line, err := r.ReadString('\n')
 	if err != nil {
 		return false
