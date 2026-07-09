@@ -76,6 +76,20 @@ func note(s model.Server) string {
 	return "-"
 }
 
+// Describe is the one-line identity of a server used in kill confirmations
+// and status lines — shared by CLI and TUI so the same kill is always
+// described the same way.
+func Describe(s model.Server) string {
+	name := Sanitize(s.DisplayName())
+	if name == "" {
+		name = "(unknown)"
+	}
+	if s.Source == model.SourceDocker {
+		return fmt.Sprintf(":%d %s [container %s]", s.Port, name, Sanitize(s.Name))
+	}
+	return fmt.Sprintf(":%d %s [pid %d]", s.Port, name, s.PID)
+}
+
 // SrcLabel is the short source tag shown in tables ("proc"/"docker").
 func SrcLabel(src model.Source) string {
 	switch src {
