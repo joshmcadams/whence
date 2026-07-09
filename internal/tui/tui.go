@@ -59,6 +59,7 @@ type Model struct {
 	planSingle kill.Plan // blast radius single-listener plan for the pending confirm
 	killSingle bool      // confirm-time toggle: listener-only vs whole tree
 	theme      Theme
+	keys       keyMap
 
 	status string
 	err    error
@@ -86,6 +87,7 @@ func New(cfg config.Config, all bool) Model {
 
 	m := Model{
 		cfg: cfg, all: all, table: t, ti: ti, theme: ThemeByName(cfg.Theme),
+		keys:        defaultKeyMap(),
 		previewBoth: kill.PreviewBoth,
 		// appliedSeq starts below any real sequence number (which starts at
 		// 0) so the very first loadedMsg — issued by hand at seq 0 from
