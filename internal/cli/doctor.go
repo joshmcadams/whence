@@ -50,12 +50,15 @@ func runDoctor() error {
 		row("ignored names", strings.Join(cfg.IgnoreNames, ", ")+" (bypass with list --no-ignore)")
 	}
 
-	// macOS leans on lsof for cwd (and possibly socket enumeration).
+	// macOS requires lsof for both socket enumeration and cwd resolution.
+	// gopsutil shells out to lsof inside gnet.Connections for the socket scan
+	// itself, not just for cwd — so without lsof, whence cannot list servers
+	// at all on macOS.
 	if runtime.GOOS == "darwin" {
 		if path, err := exec.LookPath("lsof"); err == nil {
 			row("lsof", "found at "+path)
 		} else {
-			row("lsof", "MISSING — cwd resolution will fail on macOS")
+			row("lsof", "MISSING — socket enumeration and cwd resolution both require lsof on macOS")
 		}
 	}
 

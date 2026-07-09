@@ -131,7 +131,9 @@ nothing below `inventory` should import `cli`, `tui`, or `inventory`.
   → `tcp`/`127.0.0.1`. Genuinely distinct IP bindings and unattributed rows
   (PID ≤ 0) are left untouched. This is intentional — do not revert to the
   old per-proto dedup key without updating `scan_test.go`.
-- **macOS cwd needs `lsof`**; Windows cwd reads the PEB via gopsutil and is the
+- **macOS requires `lsof` for both socket enumeration and cwd resolution**
+  (gopsutil shells out to lsof inside `gnet.Connections`); Windows cwd reads
+  the PEB via gopsutil and is the
   least-exercised path. `doctor` reports both.
 
 ## Off-machine work

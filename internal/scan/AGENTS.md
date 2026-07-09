@@ -18,7 +18,7 @@ switch in `scan.go`; add/adjust the per-OS file.
 | File | Build tag | Mechanism | Notes |
 |------|-----------|-----------|-------|
 | `cwd_linux.go` | `linux` | `readlink /proc/<pid>/cwd` | Also covers WSL. Other users' procs → permission error. |
-| `cwd_darwin.go` | `darwin` | parse `lsof -a -p <pid> -d cwd -Fn` | Makes `lsof` a **runtime dependency** on macOS (`doctor` reports it). gopsutil has no Darwin `Cwd()`. |
+| `cwd_darwin.go` | `darwin` | batched `lsof -a -p <pids> -d cwd -Fpn` | lsof is also required for socket enumeration (gopsutil's `gnet.Connections` shells out to it). One call resolves all process cwds; errors become per-row notes via `processCwds` + `cwdResult`. |
 | `cwd_windows.go` | `windows` | gopsutil reads the PEB via `NtQueryInformationProcess` | **Least-exercised path** — not run on the Linux/WSL dev box. Verify on a real Windows host. |
 
 ## Rules
