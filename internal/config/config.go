@@ -5,7 +5,6 @@ package config
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -55,16 +54,18 @@ func Default() Config {
 
 // Path returns the config file location (XDG on unix, %AppData% on Windows).
 func Path() string {
-	if runtime.GOOS == "windows" {
-		if base := os.Getenv("AppData"); base != "" {
-			return filepath.Join(base, "whence", "config.toml")
-		}
-	}
+	return filepath.Join(configBase(), "config.toml")
+}
+
+// xdgWhenceDir returns the whence config directory following the XDG Base
+// Directory Specification: $XDG_CONFIG_HOME/whence when set, otherwise
+// ~/.config/whence.
+func xdgWhenceDir() string {
 	if base := os.Getenv("XDG_CONFIG_HOME"); base != "" {
-		return filepath.Join(base, "whence", "config.toml")
+		return filepath.Join(base, "whence")
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", "whence", "config.toml")
+	return filepath.Join(home, ".config", "whence")
 }
 
 // Load reads the config file, falling back to defaults for any missing fields.
