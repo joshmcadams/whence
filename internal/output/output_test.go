@@ -86,6 +86,70 @@ func TestDescribe(t *testing.T) {
 	}
 }
 
+func TestRow(t *testing.T) {
+	cases := []struct {
+		name  string
+		s     model.Server
+		w     int
+		wPort string
+		wName string
+		wDesc string
+		wPID  string
+	}{
+		{
+			name: "attributed row", s: model.Server{Port: 5173, Proto: "tcp", PID: 100, Source: model.SourceProcess,
+				Address: "127.0.0.1",
+				Project: &model.Project{Name: "myapp", Description: "a cool app"}},
+			w: 60, wPort: "5173", wName: "myapp", wDesc: "a cool app", wPID: "100",
+		},
+		{
+			name: "unattributed row with note", s: model.Server{Port: 9999, Proto: "tcp", Source: model.SourceProcess,
+				Address: "127.0.0.1",
+				Notes: []string{"cwd unreadable"}},
+			w: 60, wPort: "9999", wName: "-", wDesc: "(cwd unreadable)", wPID: "-",
+		},
+		{
+			name: "exposure-all marker", s: model.Server{Port: 8080, Proto: "tcp", PID: 7, Source: model.SourceProcess,
+				Project: &model.Project{Name: "server"}},
+			w: 60, wPort: "8080", wName: "server [!]", wDesc: "-", wPID: "7",
+		},
+		{
+			name: "empty-everything fallbacks", s: model.Server{Port: 0, Proto: "", PID: 0, Source: model.SourceProcess,
+				Address: "127.0.0.1"},
+			w: 60, wPort: "0", wName: "-", wDesc: "-", wPID: "-",
+		},
+		{
+			name: "truncated description", s: model.Server{Port: 3000, Proto: "tcp", Source: model.SourceProcess,
+				Address: "127.0.0.1",
+				Project: &model.Project{Description: "abcdefghijklmnop"}},
+			w: 5, wPort: "3000", wDesc: "abcd…",
+		},
+		{
+			name: "docker row", s: model.Server{Port: 5432, Proto: "tcp", Source: model.SourceDocker,
+				Address: "127.0.0.1",
+				Name: "db-1", Project: &model.Project{Name: "app"}},
+			w: 60, wPort: "5432", wName: "app", wPID: "-",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cells := Row(tc.s, tc.w)
+			if tc.wPort != "" && cells[0] != tc.wPort {
+				t.Errorf("cells[0] = %q, want %q", cells[0], tc.wPort)
+			}
+			if tc.wPID != "" && cells[2] != tc.wPID {
+				t.Errorf("cells[2] = %q, want %q", cells[2], tc.wPID)
+			}
+			if tc.wName != "" && cells[5] != tc.wName {
+				t.Errorf("cells[5] = %q, want %q", cells[5], tc.wName)
+			}
+			if tc.wDesc != "" && cells[6] != tc.wDesc {
+				t.Errorf("cells[6] = %q, want %q", cells[6], tc.wDesc)
+			}
+		})
+	}
+}
+
 func TestTable_Empty(t *testing.T) {
 	var buf bytes.Buffer
 	Table(&buf, nil, 0)

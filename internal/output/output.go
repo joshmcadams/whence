@@ -48,23 +48,9 @@ func Table(w io.Writer, servers []model.Server, hidden int) {
 	tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
 	fmt.Fprintln(tw, "PORT\tPROTO\tPID\tUPTIME\tSRC\tSERVER\tDESCRIPTION")
 	for _, s := range servers {
-		name := Sanitize(s.DisplayName())
-		if name == "" {
-			name = "-"
-		}
-		if s.Exposure() == "all" {
-			name += " [!]"
-		}
-		desc := Sanitize(s.Description())
-		if desc == "" {
-			desc = note(s)
-		}
-		pid := "-"
-		if s.PID > 0 {
-			pid = fmt.Sprint(s.PID)
-		}
-		fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\t%s\t%s\n",
-			s.Port, Sanitize(s.Proto), pid, HumanUptime(s.Uptime), SrcLabel(s.Source), name, Truncate(desc, 60))
+		cells := Row(s, 60)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			cells[0], cells[1], cells[2], cells[3], cells[4], cells[5], cells[6])
 	}
 	tw.Flush()
 }
@@ -88,6 +74,48 @@ func Describe(s model.Server) string {
 		return fmt.Sprintf(":%d %s [container %s]", s.Port, name, Sanitize(s.Name))
 	}
 	return fmt.Sprintf(":%d %s [pid %d]", s.Port, name, s.PID)
+}
+
+// Row builds the seven display cells for one server, shared by the CLI
+// table and the TUI so the two renderings cannot drift. Each renderer picks
+// the columns it needs by index (see the constant list below).
+//
+// Index  Cell
+//   0    PORT       e.g. "5173"
+//   1    PROTO      e.g. "tcp" (sanitized)
+//   2    PID        e.g. "100" or "-" when ≤ 0
+//   3    UPTIME     e.g. "45s" (HumanUptime)
+//   4    SRC        e.g. "proc" / "docker" (SrcLabel)
+//   5    SERVER     DisplayName with " [!]" when Exposure()=="all", "-" when empty
+//   6    DESCRIPTION Truncated to descWidth; falls back to note(s); "-" when empty
+func Row(s model.Server, descWidth int) []string {
+	name := Sanitize(s.DisplayName())
+	if name == "" {
+		name = "-"
+	}
+	if s.Exposure() == "all" {
+		name += " [!]"
+	}
+
+	desc := Sanitize(s.Description())
+	if desc == "" {
+		desc = note(s)
+	}
+
+	pid := "-"
+	if s.PID > 0 {
+		pid = fmt.Sprint(s.PID)
+	}
+
+	return []string{
+		fmt.Sprint(s.Port),
+		Sanitize(s.Proto),
+		pid,
+		HumanUptime(s.Uptime),
+		SrcLabel(s.Source),
+		name,
+		Truncate(desc, descWidth),
+	}
 }
 
 // SrcLabel is the short source tag shown in tables ("proc"/"docker").

@@ -370,17 +370,14 @@ func (m *Model) rebuild() {
 	descW := descWidth(m.width)
 	rows := make([]table.Row, len(m.rows))
 	for i, s := range m.rows {
-		name := output.Sanitize(s.DisplayName())
-		if s.Exposure() == "all" {
-			name += " [!]"
-		}
+		cells := output.Row(s, descW)
 		rows[i] = table.Row{
-			fmt.Sprintf("%d", s.Port),
-			output.Sanitize(s.Proto),
-			output.HumanUptime(s.Uptime),
-			output.SrcLabel(s.Source),
-			name,
-			output.Truncate(output.Sanitize(s.Description()), descW),
+			cells[0], // PORT
+			cells[1], // PROTO
+			cells[3], // UPTIME  (skip index 2 = PID)
+			cells[4], // SRC
+			cells[5], // SERVER
+			cells[6], // DESCRIPTION
 		}
 	}
 	m.table.SetRows(rows)
