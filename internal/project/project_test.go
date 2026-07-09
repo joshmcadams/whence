@@ -28,7 +28,7 @@ func TestDetect_GitRootCollapsesMonorepoSubdir(t *testing.T) {
 	writeFile(t, filepath.Join(web, "package.json"), `{"name":"web"}`)
 
 	// A process running from the web subdir must resolve to the repo root.
-	got := Detect(web)
+	got := NewCache().Detect(web)
 	if got == nil {
 		t.Fatal("expected a project, got nil")
 	}
@@ -51,7 +51,7 @@ func TestDetect_GitFileWorktreeResolvesToWorktreeRoot(t *testing.T) {
 	writeFile(t, filepath.Join(root, ".git"), "gitdir: /somewhere/else\n")
 	writeFile(t, filepath.Join(root, "web", "package.json"), `{"name":"web"}`)
 
-	got := Detect(filepath.Join(root, "web"))
+	got := NewCache().Detect(filepath.Join(root, "web"))
 	if got == nil {
 		t.Fatal("expected a project, got nil")
 	}
@@ -75,7 +75,7 @@ func TestDetect_GitFileWorktreeDoesNotOverWalkToEnclosingRepo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := Detect(src)
+	got := NewCache().Detect(src)
 	if got == nil {
 		t.Fatal("expected a project, got nil")
 	}
@@ -91,7 +91,7 @@ func TestDetect_ManifestFallbackWhenNoGit(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "go.mod"), "module github.com/me/widget\n\ngo 1.26\n")
 
-	got := Detect(root)
+	got := NewCache().Detect(root)
 	if got == nil {
 		t.Fatal("expected a project, got nil")
 	}
@@ -104,7 +104,7 @@ func TestDetect_ManifestFallbackWhenNoGit(t *testing.T) {
 }
 
 func TestDetect_NoMarkersReturnsNil(t *testing.T) {
-	if got := Detect(t.TempDir()); got != nil {
+	if got := NewCache().Detect(t.TempDir()); got != nil {
 		t.Errorf("expected nil for a dir with no markers, got %+v", got)
 	}
 }

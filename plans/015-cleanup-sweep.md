@@ -5,9 +5,10 @@
 > update this plan's status row in `plans/README.md` — unless a reviewer told
 > you they maintain the index.
 >
-> **Drift check (run first)**: `git diff --stat caec51a..HEAD -- internal/project internal/tui/theme.go internal/cli/collect.go internal/cli/list.go internal/cli/kill.go internal/config internal/kill/kill.go internal/scan`
+> **Drift check (run first)**: `git diff --stat 81670c7..HEAD -- internal/project internal/tui/theme.go internal/cli/collect.go internal/cli/list.go internal/cli/kill.go internal/config internal/kill/kill.go internal/scan`
 > Plan 013 must be DONE — it converts `internal/cli/collect.go` into a test
-> seam that this sweep must NOT delete.
+> seam that this sweep must NOT delete. Line numbers below reflect commit
+> `81670c7` (post-plans 001-018); reconcile against live code if drifted.
 
 ## Status
 
@@ -16,7 +17,7 @@
 - **Risk**: LOW (deletions of verified-unused code + mechanical moves)
 - **Depends on**: plans/013-remaining-test-seams.md
 - **Category**: tech-debt
-- **Planned at**: commit `bc713ee`, 2026-07-09
+- **Planned at**: commit `81670c7`, 2026-07-09
 
 ## Why this matters
 
@@ -62,16 +63,17 @@ Small drift traps, each verified at planning time:
 
   Build-tag pattern to copy: `internal/scan/cwd_linux.go` /
   `cwd_windows.go` / `cwd_darwin.go` (one small function per file).
-- `internal/kill/kill.go:105` and `:149` — the duplicated
+- `internal/kill/kill.go:137` and `:181` — the duplicated
   `no accessible pid (owned by another user; try elevated privileges)`;
-  `internal/scan/scan.go:51` — the variant
+  `internal/scan/scan.go:99` — the variant
   `no pid (owned by another user; rerun with elevated privileges)`.
-- `internal/kill/kill.go:208-209` — `fmt.Errorf("%v: %s", err, out)`.
+- `internal/kill/kill.go:245` — `fmt.Errorf("%v: %s", err, out)`.
 - `internal/scan/cwd_linux.go:18` — replaces a permission error with a bare
-  `fmt.Errorf("permission denied")`, discarding the original (verify the
-  exact line in the live file; wrap instead).
-- `internal/cli/list.go:123-131` — `filter()`; only caller
-  `internal/cli/kill.go:107-113`.
+  `fmt.Errorf("permission denied")`, discarding the original. NOTE: this file
+  also contains `processCwds` (added by plan 018 at lines 25-35) — do NOT
+  touch that function; only fix the `processCwd` wrapping at line 18.
+- `internal/cli/list.go:130` — `filter()`; only caller
+  `internal/cli/kill.go:132-138` (inside `matchTargets`).
 - `internal/cli/collect.go` — after plan 013 it is `var collect = func(...)`;
   KEEP IT.
 
@@ -149,7 +151,7 @@ Small drift traps, each verified at planning time:
 - Hoist the no-pid message: `var errNoPID = errors.New("no accessible pid (owned by another user; try elevated privileges)")`
   in `kill.go`; use it at both sites (`Plan.Lines` prints `errNoPID.Error()`,
   `Server` returns it).
-- `scan.go:51`'s note stays a *note* (different surface, "no pid" prefix is
+- `scan.go:99`'s note stays a *note* (different surface, "no pid" prefix is
   scan-specific) but align the advice tail to one phrasing — pick
   "rerun with elevated privileges" for both files or unify on the kill one;
   choose ONE and apply to all three sites.

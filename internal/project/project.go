@@ -52,27 +52,6 @@ var manifests = []string{
 	"composer.json", "Gemfile", "build.gradle", "pom.xml", "Makefile",
 }
 
-// Detect walks up from startDir and returns the project it belongs to, or nil.
-// The repo root is the nearest ancestor containing .git; failing that, the
-// nearest ancestor containing a known manifest. Anchoring on .git means a
-// monorepo's subdir (e.g. jfdid/web) resolves to the same project (jfdid) as
-// the rest of the repo, so grouping/kill-by-name behaves intuitively.
-func Detect(startDir string) *model.Project {
-	if startDir == "" {
-		return nil
-	}
-	root, marker := findRoot(startDir)
-	if root == "" {
-		return nil
-	}
-	return &model.Project{
-		Name:        name(root),
-		Root:        root,
-		Description: Description(root),
-		Marker:      marker,
-	}
-}
-
 func findRoot(start string) (root, marker string) {
 	dir := filepath.Clean(start)
 	var firstManifest, firstManifestMarker string

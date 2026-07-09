@@ -50,15 +50,6 @@ func nextTheme(name string) Theme {
 	return themes[0]
 }
 
-// ThemeNames lists the available theme names (for help/config docs).
-func ThemeNames() []string {
-	names := make([]string, len(themes))
-	for i, t := range themes {
-		names[i] = t.Name
-	}
-	return names
-}
-
 // tableStyles builds bubbles/table styles for this theme.
 func (t Theme) tableStyles() table.Styles {
 	st := table.DefaultStyles()
