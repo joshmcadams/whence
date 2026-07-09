@@ -29,7 +29,7 @@ Repo ground rules that apply to EVERY plan (from `AGENTS.md`):
 | 008 | Reconcile stale docs: backlog, DESIGN.md, README, phase comments, kill-climb caveat | P2 | S | 007 | DONE |
 | 009 | TUI refresh integrity: in-flight guard + snapshot generation counter | P2 | S | — | DONE |
 | 010 | Harden attribution inputs: bounded file reads, compose workdir validation, `--` separators | P2 | S | — | DONE |
-| 011 | Release pipeline hardening: CI permissions, SHA-pinned actions, reproducible releases | P2 | S | — | TODO |
+| 011 | Release pipeline hardening: CI permissions, SHA-pinned actions, reproducible releases | P2 | S | — | DONE |
 | 012 | Stable sorts and `--watch` input validation | P2 | S | — | TODO |
 | 013 | Remaining test seams: TUI preview, classify orchestration, CLI layer | P2 | M | 001 | TODO |
 | 014 | Single source of truth for row rendering and server descriptions (CLI + TUI) | P2 | M | 003 | TODO |
@@ -277,6 +277,32 @@ in different packages and don't conflict. Everything touching `internal/tui/tui.
   actual running containers to confirm the new validation doesn't break
   real-world usage. Three uncached re-runs, full lint/test gate, and
   `git status` cleanliness all independently confirmed.
+
+- **011 — DONE.** Reconciled before dispatch: plan 007 added a fourth
+  `vulncheck` job to `ci.yml`, so the action-pin count was 4x checkout/setup-go
+  in that file (not the plan's stated 3x) — corrected in the dispatch note,
+  along with confirming `go mod tidy` was clean and `gh` was authenticated.
+  Executed in worktree branch `worktree-agent-a09331be46da9528d` (commit
+  branch `advisor/011-release-hardening`), reviewed and approved 2026-07-09.
+  Added `permissions: contents: read` to `ci.yml`; pinned every third-party
+  action in both workflows to a commit SHA (5x checkout, 5x setup-go, 1x
+  golangci-lint-action, 2x goreleaser-action); added a go.mod-tidiness CI
+  check; removed the release-time `go mod tidy` hook and the macOS
+  quarantine-strip hook; documented the resulting Gatekeeper prompt in
+  README. `release.yml`'s unrelated `go-version: stable` was correctly left
+  untouched (out of scope). One well-justified deviation: `releases/latest`
+  for all four actions now returns major-version bumps that would violate
+  the plan's own "stay on the same major" constraint, so the executor
+  filtered tags to the current major and took the highest patch instead.
+  Because this plan pins security-relevant SHAs, reviewer did not just trust
+  the report: independently re-resolved all four tag-to-SHA mappings against
+  GitHub's live API (byte-for-byte matches) and separately confirmed each is
+  genuinely the highest patch within its correct major, not merely a valid
+  one. Reviewer also ran a real `goreleaser check` (the executor's binary
+  wasn't installed locally and it deferred that check to CI) and got the
+  same "1 configuration file(s) validated" result; all three touched YAML
+  files parse cleanly via a real parser. Full lint/test gate and `git status`
+  cleanliness independently confirmed.
 
 ## Findings considered and rejected (do not re-audit)
 
