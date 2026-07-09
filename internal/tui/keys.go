@@ -6,6 +6,7 @@ type keyMap struct {
 	Up, Down             bkey.Binding
 	Kill, Detail, Filter bkey.Binding
 	All, Theme, Refresh  bkey.Binding
+	Sort                 bkey.Binding
 	Quit                 bkey.Binding
 
 	ConfirmYes, ConfirmScope bkey.Binding
@@ -25,6 +26,7 @@ func defaultKeyMap() keyMap {
 		Filter:  bkey.NewBinding(bkey.WithKeys("/"), bkey.WithHelp("/", "filter")),
 		All:     bkey.NewBinding(bkey.WithKeys("a"), bkey.WithHelp("a", "all")),
 		Theme:   bkey.NewBinding(bkey.WithKeys("t"), bkey.WithHelp("t", "theme")),
+		Sort:    bkey.NewBinding(bkey.WithKeys("s"), bkey.WithHelp("s", "sort")),
 		Refresh: bkey.NewBinding(bkey.WithKeys("r"), bkey.WithHelp("r", "refresh")),
 		Quit:    bkey.NewBinding(bkey.WithKeys("q", "esc"), bkey.WithHelp("q/esc", "quit")),
 

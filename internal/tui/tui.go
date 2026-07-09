@@ -59,6 +59,8 @@ type Model struct {
 	planTree   kill.Plan // blast radius whole-tree plan for the pending confirm
 	planSingle kill.Plan // blast radius single-listener plan for the pending confirm
 	killSingle bool      // confirm-time toggle: listener-only vs whole tree
+	detailPlan kill.Plan // tree plan computed at detail-entry time (not clobbered by confirm)
+	sortBy     string    // current sort key (port/uptime/name)
 	theme      Theme
 	keys       keyMap
 
@@ -90,6 +92,7 @@ func New(cfg config.Config, all bool) Model {
 		cfg: cfg, all: all, table: t, ti: ti, theme: ThemeByName(cfg.Theme),
 		keys:        defaultKeyMap(),
 		previewBoth: kill.PreviewBoth,
+		sortBy:      "port",
 		// appliedSeq starts below any real sequence number (which starts at
 		// 0) so the very first loadedMsg — issued by hand at seq 0 from
 		// Init, see below — is never dropped as stale. loading starts true
@@ -322,6 +325,18 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case bkey.Matches(msg, m.keys.Theme):
 		m = m.cycleTheme()
 		return m, persistThemeCmd(m.cfg)
+	case bkey.Matches(msg, m.keys.Sort):
+		switch m.sortBy {
+		case "port":
+			m.sortBy = "uptime"
+		case "uptime":
+			m.sortBy = "name"
+		default:
+			m.sortBy = "port"
+		}
+		m.status = "sort: " + m.sortBy
+		m.rebuild()
+		return m, nil
 	case bkey.Matches(msg, m.keys.Filter):
 		m.mode = modeFilter
 		m.ti.Focus()
@@ -337,6 +352,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case bkey.Matches(msg, m.keys.Detail):
 		if s, ok := m.current(); ok {
 			m.selected = s
+			tree, _ := m.previewBoth(s, m.killOpts())
+			m.detailPlan = tree
 			m.mode = modeDetail
 		}
 		return m, nil
@@ -369,6 +386,9 @@ func (m Model) current() (pm.Server, bool) {
 // rebuild recomputes the filtered view and refreshes the table rows.
 func (m *Model) rebuild() {
 	m.rows = inventory.View(m.raw, m.cfg, m.all, 0, m.query)
+	if m.sortBy != "" && m.sortBy != "port" {
+		inventory.Sort(m.rows, m.sortBy)
+	}
 	descW := descWidth(m.width)
 	rows := make([]table.Row, len(m.rows))
 	for i, s := range m.rows {
@@ -431,6 +451,9 @@ func (m Model) headerView() string {
 	if m.query != "" {
 		meta += dimStyle.Render(" · /" + m.query)
 	}
+	if m.sortBy != "" && m.sortBy != "port" {
+		meta += dimStyle.Render(" · sort:" + m.sortBy)
+	}
 	if m.err != nil {
 		meta += errStyle.Render("  scan error: " + output.Sanitize(m.err.Error()))
 	}
@@ -451,6 +474,7 @@ func (m Model) helpLine() string {
 		add(m.keys.Filter)
 		add(m.keys.All)
 		add(m.keys.Theme)
+		add(m.keys.Sort)
 		add(m.keys.Refresh)
 		add(m.keys.Quit)
 	case modeConfirm:
@@ -478,10 +502,28 @@ func (m Model) footerView() string {
 	return help
 }
 
-// maxConfirmTreeLines caps how many tree rows the confirm box renders so a large
-// blast radius can't push the [y/N] prompt off-screen; the header still states
+// maxConfirmTreeLines caps how many tree rows are rendered so a large
+// blast radius can't push the view off-screen; the header still states
 // the true total.
 const maxConfirmTreeLines = 12
+
+// renderTreeLines returns a capped, sanitized list of tree-member lines for a
+// kill plan, plus an overflow count. Shared by confirmView and detailView so
+// neither can render a different blast radius from the other.
+func renderTreeLines(p kill.Plan) (lines []string, overflow int) {
+	all := p.Lines()
+	shown := all
+	if len(shown) > maxConfirmTreeLines {
+		shown = shown[:maxConfirmTreeLines]
+	}
+	for _, line := range shown {
+		lines = append(lines, output.Sanitize(line))
+	}
+	if len(all) > len(shown) {
+		overflow = len(all) - len(shown)
+	}
+	return
+}
 
 // confirmView renders the kill confirmation: the target, the full process tree
 // it will signal (the blast radius), the current scope, and the prompt. It uses
@@ -497,16 +539,12 @@ func (m Model) confirmView() string {
 	}
 	b.WriteString(head + "\n")
 
-	lines := p.Lines()
-	shown := lines
-	if len(shown) > maxConfirmTreeLines {
-		shown = shown[:maxConfirmTreeLines]
+	treeLines, overflow := renderTreeLines(p)
+	for _, line := range treeLines {
+		b.WriteString("  " + dimStyle.Render(line) + "\n")
 	}
-	for _, line := range shown {
-		b.WriteString("  " + dimStyle.Render(output.Sanitize(line)) + "\n")
-	}
-	if len(lines) > len(shown) {
-		b.WriteString("  " + dimStyle.Render(fmt.Sprintf("… +%d more", len(lines)-len(shown))) + "\n")
+	if overflow > 0 {
+		b.WriteString("  " + dimStyle.Render(fmt.Sprintf("… +%d more", overflow)) + "\n")
 	}
 
 	// Scope toggle is meaningful only for native process trees.
@@ -552,6 +590,17 @@ func (m Model) detailView() string {
 	}
 	b.WriteString("\n" + detailLabel.Render("Description") + "\n")
 	b.WriteString(wordWrap(output.Sanitize(s.Description()), 72) + "\n")
+
+	treeLines, overflow := renderTreeLines(m.detailPlan)
+	if len(treeLines) > 0 {
+		b.WriteString("\n" + detailLabel.Render("Tree") + "\n")
+		for _, line := range treeLines {
+			b.WriteString(line + "\n")
+		}
+		if overflow > 0 {
+			fmt.Fprintf(&b, "… +%d more\n", overflow)
+		}
+	}
 	return b.String()
 }
 

@@ -557,3 +557,123 @@ func TestFooterHelp_FilterMode(t *testing.T) {
 		t.Error("filter footer missing 'clear'")
 	}
 }
+
+// --- Feature 1: detail view process tree -------------------------------------
+
+func TestDetailViewShowsProcessTree(t *testing.T) {
+	m := newLoaded()
+	m.previewBoth = func(s pm.Server, _ kill.Opts) (kill.Plan, kill.Plan) {
+		return kill.Plan{Tree: []kill.TreeMember{
+			{PID: 1, Name: "bash"}, {PID: 100, Name: "node"}, {PID: 101, Name: "vite"},
+		}}, kill.Plan{Tree: []kill.TreeMember{{PID: 100, Name: "node"}}}
+	}
+	m = step(m, key("enter"))
+	if m.mode != modeDetail {
+		t.Fatalf("mode = %v, want modeDetail", m.mode)
+	}
+	if len(m.detailPlan.Tree) == 0 {
+		t.Fatal("detailPlan.Tree is empty — detail view would hide the tree")
+	}
+	v := m.View()
+	for _, pid := range []string{"1", "100", "101"} {
+		if !strings.Contains(v, pid) {
+			t.Errorf("detail view missing pid %s:\n%s", pid, v)
+		}
+	}
+	if !strings.Contains(v, "Tree") {
+		t.Errorf("detail view missing Tree section:\n%s", v)
+	}
+}
+
+func TestDetailViewDockerTree(t *testing.T) {
+	m := newLoadedDocker()
+	m.previewBoth = func(s pm.Server, _ kill.Opts) (kill.Plan, kill.Plan) {
+		return kill.Plan{Server: s, Docker: true}, kill.Plan{Server: s, Docker: true}
+	}
+	m = step(m, key("enter"))
+	if m.mode != modeDetail {
+		t.Fatalf("mode = %v, want modeDetail", m.mode)
+	}
+	v := m.View()
+	if !strings.Contains(v, "docker stop") {
+		t.Errorf("detail view missing 'docker stop' for docker server:\n%s", v)
+	}
+}
+
+// --- Feature 3: sort ---------------------------------------------------------
+
+func sortTestServers() []pm.Server {
+	return []pm.Server{
+		{Port: 3000, Proto: "tcp", PID: 200, Source: pm.SourceProcess, Confidence: 100,
+			Cwd: "/r", Name: "alpha", Project: &pm.Project{Name: "alpha", Root: "/r"}},
+		{Port: 5173, Proto: "tcp", PID: 100, Source: pm.SourceProcess, Confidence: 100,
+			Cwd: "/r", Name: "beta", Project: &pm.Project{Name: "beta", Root: "/r"}},
+		{Port: 8080, Proto: "tcp", PID: 300, Source: pm.SourceProcess, Confidence: 100,
+			Cwd: "/r", Name: "gamma", Project: &pm.Project{Name: "gamma", Root: "/r"}},
+	}
+}
+
+func newLoadedSort() Model {
+	m := New(config.Config{ConfidenceThreshold: 50}, true)
+	m = step(m, tea.WindowSizeMsg{Width: 100, Height: 24})
+	m = step(m, loadedMsg{servers: sortTestServers()})
+	return m
+}
+
+func TestSortCycle(t *testing.T) {
+	m := newLoadedSort()
+	if m.sortBy != "port" {
+		t.Fatalf("default sortBy = %q, want port", m.sortBy)
+	}
+	firstPort := m.rows[0].Port
+	if firstPort != 3000 {
+		t.Fatalf("default sort should be by port ascending, got first port %d", firstPort)
+	}
+
+	// Press s: port → uptime
+	m = step(m, key("s"))
+	if m.sortBy != "uptime" {
+		t.Errorf("sortBy after first s = %q, want uptime", m.sortBy)
+	}
+	if !strings.Contains(m.status, "sort: uptime") {
+		t.Errorf("status after sort = %q, want it to mention 'sort: uptime'", m.status)
+	}
+
+	// Press s: uptime → name
+	m = step(m, key("s"))
+	if m.sortBy != "name" {
+		t.Errorf("sortBy after second s = %q, want name", m.sortBy)
+	}
+	if m.rows[0].Name != "alpha" {
+		t.Errorf("sort by name: first row = %q, want alpha", m.rows[0].Name)
+	}
+
+	// Press s: name → port (wrap)
+	m = step(m, key("s"))
+	if m.sortBy != "port" {
+		t.Errorf("sortBy after third s = %q, want port (wrap)", m.sortBy)
+	}
+
+	// Header should not show sort for default
+	v := m.View()
+	if strings.Contains(v, "sort:port") {
+		t.Error("header should not show sort:port (default)")
+	}
+}
+
+func TestSortHeaderVisibility(t *testing.T) {
+	m := newLoadedSort()
+	m = step(m, key("s")) // port → uptime
+	v := m.View()
+	if !strings.Contains(v, "sort:uptime") {
+		t.Errorf("header missing sort indicator:\n%s", v)
+	}
+}
+
+func TestSortInFooterHelp(t *testing.T) {
+	m := newLoadedSort()
+	v := m.View()
+	if !strings.Contains(v, "sort") {
+		t.Errorf("list-mode footer missing 'sort':\n%s", v)
+	}
+}
