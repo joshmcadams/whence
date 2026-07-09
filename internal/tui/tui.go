@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	bkey "github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -260,15 +261,15 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch m.mode {
 	case modeFilter:
-		switch msg.String() {
-		case "esc":
+		if bkey.Matches(msg, m.keys.FilterCancel) {
 			m.query = ""
 			m.ti.SetValue("")
 			m.ti.Blur()
 			m.mode = modeList
 			m.rebuild()
 			return m, nil
-		case "enter":
+		}
+		if bkey.Matches(msg, m.keys.FilterApply) {
 			m.ti.Blur()
 			m.mode = modeList
 			return m, nil
@@ -300,33 +301,32 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case modeDetail:
-		switch msg.String() {
-		case "esc", "enter", "q":
+		if bkey.Matches(msg, m.keys.DetailBack) {
 			m.mode = modeList
 		}
 		return m, nil
 	}
 
 	// modeList
-	switch msg.String() {
-	case "q", "esc":
+	switch {
+	case bkey.Matches(msg, m.keys.Quit):
 		return m, tea.Quit
-	case "r":
+	case bkey.Matches(msg, m.keys.Refresh):
 		m.status = ""
 		nm, loadC := m.nextLoadCmd()
 		return nm, loadC
-	case "a":
+	case bkey.Matches(msg, m.keys.All):
 		m.all = !m.all
 		m.rebuild()
 		return m, nil
-	case "t":
+	case bkey.Matches(msg, m.keys.Theme):
 		m = m.cycleTheme()
 		return m, persistThemeCmd(m.cfg)
-	case "/":
+	case bkey.Matches(msg, m.keys.Filter):
 		m.mode = modeFilter
 		m.ti.Focus()
 		return m, textinput.Blink
-	case "x":
+	case bkey.Matches(msg, m.keys.Kill):
 		if s, ok := m.current(); ok {
 			m.selected = s
 			m.killSingle = false
@@ -334,7 +334,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.mode = modeConfirm
 		}
 		return m, nil
-	case "enter":
+	case bkey.Matches(msg, m.keys.Detail):
 		if s, ok := m.current(); ok {
 			m.selected = s
 			m.mode = modeDetail
