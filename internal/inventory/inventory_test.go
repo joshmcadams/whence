@@ -234,3 +234,85 @@ func TestSort_NameIsPermutationStable(t *testing.T) {
 	}
 	assertSameOrder(t, "name", orderA, orderB)
 }
+
+func TestNameEquals(t *testing.T) {
+	api := model.Server{Name: "node", Project: &model.Project{Name: "api"}}
+	plain := model.Server{Name: "python3"}
+	empty := model.Server{}
+
+	cases := []struct {
+		name string
+		srv  model.Server
+		want string
+		exp  bool
+	}{
+		{"project name match", api, "api", true},
+		{"display name match (same as project)", api, "api", true},
+		{"raw name match", api, "node", true},
+		{"case insensitive", api, "api", true},
+		{"case insensitive raw", api, "node", true},
+		{"no match", api, "other", false},
+		{"plain server name match", plain, "python3", true},
+		{"plain server no match", plain, "ruby", false},
+		{"empty want never matches", api, "", false},
+		{"fully empty server empty want", empty, "", false},
+		{"fully empty server", empty, "x", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := NameEquals(tc.srv, tc.want); got != tc.exp {
+				t.Errorf("NameEquals(%+v, %q) = %v, want %v", tc.srv, tc.want, got, tc.exp)
+			}
+		})
+	}
+}
+
+func TestNameContains(t *testing.T) {
+	api := model.Server{Name: "node", Project: &model.Project{Name: "api-gateway"}}
+	plain := model.Server{Name: "python3"}
+	empty := model.Server{}
+
+	cases := []struct {
+		name string
+		srv  model.Server
+		want string
+		exp  bool
+	}{
+		{"exact project name", api, "api-gateway", true},
+		{"substring of project name", api, "gate", true},
+		{"substring of raw name", api, "nod", true},
+		{"case insensitive substring", api, "gate", true},
+		{"no match", api, "xyz", false},
+		{"plain server substring", plain, "thon", true},
+		{"plain server no match", plain, "ruby", false},
+		{"empty want never matches", api, "", false},
+		{"fully empty server", empty, "x", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := NameContains(tc.srv, tc.want); got != tc.exp {
+				t.Errorf("NameContains(%+v, %q) = %v, want %v", tc.srv, tc.want, got, tc.exp)
+			}
+		})
+	}
+}
+
+func TestView_IgnoreNames_MatchProjectName(t *testing.T) {
+	// Regression: ignore entry equal to a bare Project.Name must match
+	// even when the ignore entry is spelled differently-cased.
+	cfg := config.Config{ConfidenceThreshold: 50, IgnoreNames: []string{"JFDID"}}
+	got := View(servers(), cfg, true, 0, "")
+	if len(got) != 1 || got[0].Name != "sshd" {
+		t.Fatalf("ignoring 'JFDID' should leave only sshd, got %v", got)
+	}
+}
+
+func TestView_QueryMatchesRawName(t *testing.T) {
+	// Regression: a query should match a raw container/process name even
+	// when a project renames the display.
+	cfg := config.Config{ConfidenceThreshold: 50}
+	got := View(servers(), cfg, true, 0, "ssh")
+	if len(got) != 1 || got[0].Name != "sshd" {
+		t.Fatalf("query 'ssh' should match sshd by raw name, got %v", got)
+	}
+}

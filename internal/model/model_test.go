@@ -2,6 +2,53 @@ package model
 
 import "testing"
 
+func TestNames(t *testing.T) {
+	cases := []struct {
+		name string
+		srv  Server
+		want []string
+	}{
+		{
+			"project + display + raw",
+			Server{Name: "node", Project: &Project{Name: "myapp"}},
+			[]string{"myapp", "myapp", "node"},
+		},
+		{
+			"no project, just raw name",
+			Server{Name: "python3"},
+			[]string{"python3", "python3"},
+		},
+		{
+			"project name empty, display falls back to raw",
+			Server{Name: "node", Project: &Project{Name: ""}},
+			[]string{"node", "node"},
+		},
+		{
+			"fully empty server",
+			Server{},
+			[]string{},
+		},
+		{
+			"project with different display (display=project, but project name separate)",
+			Server{Name: "compose-svc", Project: &Project{Name: "myproject"}},
+			[]string{"myproject", "myproject", "compose-svc"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.srv.Names()
+			if len(got) != len(tc.want) {
+				t.Fatalf("Names() = %v, want %v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("Names()[%d] = %q, want %q", i, got[i], tc.want[i])
+				}
+			}
+		})
+	}
+}
+
 func TestDisplayName(t *testing.T) {
 	cases := []struct {
 		name string

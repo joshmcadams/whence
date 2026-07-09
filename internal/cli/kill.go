@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/joshmcadams/whence/internal/config"
+	"github.com/joshmcadams/whence/internal/inventory"
 	"github.com/joshmcadams/whence/internal/kill"
 	"github.com/joshmcadams/whence/internal/model"
 	"github.com/joshmcadams/whence/internal/output"
@@ -165,24 +166,10 @@ func matchTargets(servers []model.Server, target string) (matches []model.Server
 // nameMatches reports whether any of a server's names equals (exact) or contains
 // (substring) want; comparison is case-insensitive.
 func nameMatches(s model.Server, want string, exact bool) bool {
-	names := []string{s.DisplayName(), s.Name}
-	if s.Project != nil {
-		names = append(names, s.Project.Name)
+	if exact {
+		return inventory.NameEquals(s, want)
 	}
-	for _, n := range names {
-		n = strings.ToLower(n)
-		if n == "" {
-			continue
-		}
-		if exact {
-			if n == want {
-				return true
-			}
-		} else if strings.Contains(n, want) {
-			return true
-		}
-	}
-	return false
+	return inventory.NameContains(s, want)
 }
 
 // dedupeUnits collapses servers that map to the same kill action: native

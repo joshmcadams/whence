@@ -46,6 +46,23 @@ func (s Server) DisplayName() string {
 	return s.Name
 }
 
+// Names returns every name this server can be addressed by, most specific
+// first: project name, display name, raw process/container name. Empty
+// entries are omitted; no deduplication is promised.
+func (s Server) Names() []string {
+	var names []string
+	if s.Project != nil && s.Project.Name != "" {
+		names = append(names, s.Project.Name)
+	}
+	if d := s.DisplayName(); d != "" {
+		names = append(names, d)
+	}
+	if s.Name != "" {
+		names = append(names, s.Name)
+	}
+	return names
+}
+
 // Description returns the project description if known, else empty.
 func (s Server) Description() string {
 	if s.Project != nil {

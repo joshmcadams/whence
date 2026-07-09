@@ -123,6 +123,33 @@ func View(servers []model.Server, cfg config.Config, all bool, port int, query s
 	return out
 }
 
+// NameEquals reports whether want (already lowercased) exactly equals any of
+// the server's Names(), case-insensitively. Empty want never matches.
+func NameEquals(s model.Server, want string) bool {
+	if want == "" {
+		return false
+	}
+	for _, n := range s.Names() {
+		if strings.ToLower(n) == want {
+			return true
+		}
+	}
+	return false
+}
+
+// NameContains is the substring form of NameEquals.
+func NameContains(s model.Server, want string) bool {
+	if want == "" {
+		return false
+	}
+	for _, n := range s.Names() {
+		if strings.Contains(strings.ToLower(n), want) {
+			return true
+		}
+	}
+	return false
+}
+
 // isIgnored reports whether a server is suppressed by the config ignore lists:
 // its port is in IgnorePorts, or its process/container name or project name
 // matches an entry in IgnoreNames (case-insensitive, exact).
@@ -133,14 +160,12 @@ func isIgnored(s model.Server, cfg config.Config) bool {
 		}
 	}
 	if len(cfg.IgnoreNames) > 0 {
-		name := strings.ToLower(s.Name)
-		disp := strings.ToLower(s.DisplayName())
 		for _, n := range cfg.IgnoreNames {
 			n = strings.ToLower(strings.TrimSpace(n))
 			if n == "" {
 				continue
 			}
-			if name == n || disp == n {
+			if NameEquals(s, n) {
 				return true
 			}
 		}
@@ -149,7 +174,7 @@ func isIgnored(s model.Server, cfg config.Config) bool {
 }
 
 func matchesQuery(s model.Server, q string) bool {
-	if strings.Contains(strings.ToLower(s.DisplayName()), q) {
+	if NameContains(s, q) {
 		return true
 	}
 	if strings.Contains(strings.ToLower(s.Description()), q) {
