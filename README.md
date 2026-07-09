@@ -21,7 +21,7 @@ PORT  PROTO  PID     UPTIME  SRC     SERVER  DESCRIPTION
 
 - **Cross-platform** — single static binary for macOS, Linux, and Windows (incl. WSL).
 - **Knows what's yours** — a confidence score from your configured dev roots, repo markers (`.git`, `package.json`, `go.mod`, …), and dev-server-looking commands.
-- **Understands Docker Compose** — attributes containers to their repo via compose labels; Kubernetes-managed containers are filtered out.
+- **Understands Docker Compose (podman works too — detected automatically)** — attributes containers to their repo via compose labels; Kubernetes-managed containers are filtered out.
 - **Kill by port or project** — `whence kill 3000` or `whence kill myapp`. Native processes are killed as a tree (graceful `SIGTERM`, then `SIGKILL`) without touching your shell; compose services are stopped via `docker stop`.
 - **Interactive TUI** — arrow-key navigation, `x` to kill, `enter` for details, live auto-refresh.
 
@@ -138,8 +138,8 @@ targets what you name.)
    `lsof` on macOS, the PEB on Windows.
 3. Walk up to the repo root (nearest `.git`, then a manifest) for name + description.
 4. Score how likely the server is "yours" and attach the project.
-5. In parallel, query Docker for published ports and attribute compose services
-   to their repo via the `com.docker.compose.project.working_dir` label.
+5. In parallel, query the container runtime (Docker or Podman) for published ports and attribute compose services
+   to their repo via the `com.docker.compose.*` / `io.podman.compose.*` labels.
 
 ### Notes & limitations
 

@@ -62,7 +62,7 @@ extend `inventory`.
 | `internal/scan` | enumerate listening TCP sockets + owning process; **per-OS cwd resolution** (build-tagged). See `internal/scan/AGENTS.md`. |
 | `internal/project` | walk cwd → repo root; extract name + description from manifests / README. |
 | `internal/classify` | confidence score ("is this mine?") + dev-command hints. |
-| `internal/docker` | parallel detection path: `docker ps`/`inspect` → compose attribution, k8s filtering. |
+| `internal/docker` | parallel detection path: docker/podman → compose attribution, k8s filtering. |
 | `internal/inventory` | merge native + docker, the shared `View` filter, and `Sort`. |
 | `internal/kill` | tree-kill of native processes + `docker stop`; **per-OS signals**. See `internal/kill/AGENTS.md`. |
 | `internal/output` | table / JSON rendering, `HumanUptime`, `Truncate`. |

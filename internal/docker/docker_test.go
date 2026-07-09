@@ -61,7 +61,7 @@ func TestHostPorts_CapturesAddress(t *testing.T) {
 	}
 }
 
-func TestClassifyContainer(t *testing.T) {
+func TestClassifyContainer_DockerComposeLabels(t *testing.T) {
 	workdir := t.TempDir()
 
 	var c inspect
@@ -77,12 +77,62 @@ func TestClassifyContainer(t *testing.T) {
 	if conf != confCompose {
 		t.Errorf("conf = %d, want %d", conf, confCompose)
 	}
+}
 
-	// No compose labels -> no project, lower confidence.
-	var bare inspect
-	bare.Name = "/redis"
-	if proj, conf := classifyContainer(bare); proj != nil || conf != confContainer {
-		t.Errorf("bare container: proj=%+v conf=%d", proj, conf)
+func TestClassifyContainer_PodmanComposeLabels(t *testing.T) {
+	workdir := t.TempDir()
+
+	var c inspect
+	c.Name = "/myapp-web-1"
+	c.Config.Labels = map[string]string{
+		"io.podman.compose.project":             "myapp",
+		"io.podman.compose.project.working_dir": workdir,
+	}
+	proj, conf := classifyContainer(c)
+	if proj == nil || proj.Name != "myapp" || proj.Root != workdir || proj.Marker != "podman-compose" {
+		t.Fatalf("project = %+v", proj)
+	}
+	if conf != confCompose {
+		t.Errorf("conf = %d, want %d", conf, confCompose)
+	}
+}
+
+func TestClassifyContainer_BothNamespacesDockerWins(t *testing.T) {
+	dockerWorkdir := t.TempDir()
+	podmanWorkdir := t.TempDir()
+
+	var c inspect
+	c.Name = "/both-1"
+	c.Config.Labels = map[string]string{
+		"com.docker.compose.project":             "docker-app",
+		"com.docker.compose.project.working_dir": dockerWorkdir,
+		"io.podman.compose.project":              "podman-app",
+		"io.podman.compose.project.working_dir":  podmanWorkdir,
+	}
+	proj, conf := classifyContainer(c)
+	if proj == nil {
+		t.Fatal("project is nil, want docker-namespace attribution")
+	}
+	if proj.Name != "docker-app" {
+		t.Errorf("Name = %q, want %q (docker namespace wins)", proj.Name, "docker-app")
+	}
+	if proj.Root != dockerWorkdir {
+		t.Errorf("Root = %q, want %q (docker namespace wins)", proj.Root, dockerWorkdir)
+	}
+	if proj.Marker != "docker-compose" {
+		t.Errorf("Marker = %q, want %q", proj.Marker, "docker-compose")
+	}
+	if conf != confCompose {
+		t.Errorf("conf = %d, want %d", conf, confCompose)
+	}
+}
+
+func TestClassifyContainer_NoComposeLabelsIsStandalone(t *testing.T) {
+	var c inspect
+	c.Name = "/redis"
+	c.Config.Labels = map[string]string{}
+	if proj, conf := classifyContainer(c); proj != nil || conf != confContainer {
+		t.Errorf("no compose labels: proj=%+v conf=%d", proj, conf)
 	}
 }
 
@@ -155,7 +205,7 @@ func TestInspectAll_PartialSuccessOnNonZeroExit(t *testing.T) {
 		return valid, errors.New("exit status 1")
 	})
 
-	got, err := inspectAll([]string{"found", "gone"})
+	got, err := inspectAll("docker", []string{"found", "gone"})
 	if err != nil {
 		t.Fatalf("err = %v, want nil (partial success)", err)
 	}
@@ -172,7 +222,7 @@ func TestInspectAll_EmptyOutputPropagatesError(t *testing.T) {
 		return nil, wantErr
 	})
 
-	got, err := inspectAll([]string{"x"})
+	got, err := inspectAll("docker", []string{"x"})
 	if err == nil {
 		t.Fatal("err = nil, want propagated error")
 	}
@@ -189,7 +239,7 @@ func TestInspectAll_AllIDsUnknownPropagatesError(t *testing.T) {
 		return []byte(`[]`), wantErr
 	})
 
-	got, err := inspectAll([]string{"gone"})
+	got, err := inspectAll("docker", []string{"gone"})
 	if err == nil {
 		t.Fatal("err = nil, want propagated error")
 	}
@@ -204,7 +254,7 @@ func TestInspectAll_NormalPathOnSuccess(t *testing.T) {
 		return valid, nil
 	})
 
-	got, err := inspectAll([]string{"a", "b"})
+	got, err := inspectAll("docker", []string{"a", "b"})
 	if err != nil {
 		t.Fatalf("err = %v, want nil", err)
 	}

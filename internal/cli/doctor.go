@@ -64,9 +64,10 @@ func runDoctor() error {
 
 	// Docker path: availability and how many published ports we attributed.
 	if docker.Available() {
+		runtime := docker.Runtime()
 		dockers, err := docker.Servers()
 		if err != nil {
-			row("docker", "found, but query failed: "+err.Error())
+			row("container runtime", runtime+": found, but query failed: "+err.Error())
 		} else {
 			compose := 0
 			for _, d := range dockers {
@@ -74,10 +75,10 @@ func runDoctor() error {
 					compose++
 				}
 			}
-			row("docker", fmt.Sprintf("found — %d published port(s), %d compose-attributed", len(dockers), compose))
+			row("container runtime", fmt.Sprintf("%s — %d published port(s), %d compose-attributed", runtime, len(dockers), compose))
 		}
 	} else {
-		row("docker", "not found (compose services won't be detected)")
+		row("container runtime", "not found (compose services won't be detected)")
 	}
 
 	// Live probe: can we enumerate sockets, and how many did we attribute?

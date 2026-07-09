@@ -27,10 +27,21 @@ const (
 // healthy daemon (e.g. the first query after boot) without dropping results.
 const dockerTimeout = 5 * time.Second
 
-// Available reports whether the docker CLI is usable on this machine.
+// Runtime returns the container CLI to use: docker when present, else
+// podman (CLI-compatible for the ps/inspect/stop calls whence makes).
+// Empty string when neither exists.
+func Runtime() string {
+	for _, bin := range []string{"docker", "podman"} {
+		if _, err := exec.LookPath(bin); err == nil {
+			return bin
+		}
+	}
+	return ""
+}
+
+// Available reports whether a container CLI is usable on this machine.
 func Available() bool {
-	_, err := exec.LookPath("docker")
-	return err == nil
+	return Runtime() != ""
 }
 
 type inspect struct {
@@ -54,14 +65,15 @@ type inspect struct {
 // container. Kubernetes-managed containers (io.kubernetes.* labels or k8s_*
 // names) are skipped as infrastructure. If docker is unavailable, returns nil.
 func Servers() ([]model.Server, error) {
-	if !Available() {
+	bin := Runtime()
+	if bin == "" {
 		return nil, nil
 	}
-	ids, err := runningIDs()
+	ids, err := runningIDs(bin)
 	if err != nil || len(ids) == 0 {
 		return nil, err
 	}
-	containers, err := inspectAll(ids)
+	containers, err := inspectAll(bin, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -100,20 +112,34 @@ func Servers() ([]model.Server, error) {
 
 func classifyContainer(c inspect) (*model.Project, int) {
 	labels := c.Config.Labels
-	workdir := labels["com.docker.compose.project.working_dir"]
+	workdir, dockerNS := composeLabel(labels, "project.working_dir")
 	if workdir == "" || !isLocalDir(workdir) {
 		return nil, confContainer
 	}
-	name := labels["com.docker.compose.project"]
+	name, _ := composeLabel(labels, "project")
 	if name == "" {
 		name = strings.TrimPrefix(c.Name, "/")
+	}
+	marker := "docker-compose"
+	if !dockerNS {
+		marker = "podman-compose"
 	}
 	return &model.Project{
 		Name:        name,
 		Root:        workdir,
 		Description: project.Description(workdir),
-		Marker:      "docker-compose",
+		Marker:      marker,
 	}, confCompose
+}
+
+// composeLabel reads a compose label, trying the docker namespace first
+// (com.docker.compose.*) then the podman namespace (io.podman.compose.*).
+// dockerNS reports whether the value came from the docker namespace.
+func composeLabel(labels map[string]string, suffix string) (value string, dockerNS bool) {
+	if v := labels["com.docker.compose."+suffix]; v != "" {
+		return v, true
+	}
+	return labels["io.podman.compose."+suffix], false
 }
 
 // isLocalDir reports whether p is an absolute path to a directory that
@@ -204,8 +230,8 @@ func isAllInterfacesIP(ip string) bool {
 // without a real docker daemon.
 var dockerOutput = execx.Output
 
-func runningIDs() ([]string, error) {
-	out, err := dockerOutput(dockerTimeout, "docker", "ps", "-q", "--no-trunc")
+func runningIDs(bin string) ([]string, error) {
+	out, err := dockerOutput(dockerTimeout, bin, "ps", "-q", "--no-trunc")
 	if err != nil {
 		return nil, err
 	}
@@ -213,13 +239,13 @@ func runningIDs() ([]string, error) {
 }
 
 // inspectAll parses stdout even when the command exited non-zero: a
-// container that exits between `docker ps -q` and this call makes `docker
-// inspect` exit 1, but it still prints the JSON array of the containers it
+// container that exits between docker ps -q and this call makes docker
+// inspect exit 1, but it still prints the JSON array of the containers it
 // did find on stdout (errors go to stderr). Treat that as a partial success
 // rather than discarding every row for the cycle.
-func inspectAll(ids []string) ([]inspect, error) {
+func inspectAll(bin string, ids []string) ([]inspect, error) {
 	args := append([]string{"inspect", "--"}, ids...)
-	out, err := dockerOutput(dockerTimeout, "docker", args...)
+	out, err := dockerOutput(dockerTimeout, bin, args...)
 	var containers []inspect
 	if jsonErr := json.Unmarshal(out, &containers); jsonErr == nil && len(containers) > 0 {
 		return containers, nil // partial success: some ids resolved before exit 1
