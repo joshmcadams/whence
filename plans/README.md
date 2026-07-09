@@ -23,7 +23,7 @@ Repo ground rules that apply to EVERY plan (from `AGENTS.md`):
 | 002 | Harden kill targeting: identity re-check, cycle guards, zombie-aware liveness | P1 | M | 001 | DONE |
 | 003 | Sanitize untrusted strings at every terminal render boundary | P1 | S | — | DONE |
 | 004 | Recognize `.git` files (worktrees/submodules) in project root detection | P1 | S | — | DONE |
-| 005 | Scan row correctness: address-aware dedup, `*` exposure, extraction for tests | P1 | M | — | TODO |
+| 005 | Scan row correctness: address-aware dedup, `*` exposure, extraction for tests | P1 | M | — | DONE |
 | 006 | Inventory merge correctness + docker JSON contract tests | P1 | M | — | TODO |
 | 007 | Toolchain/CI cluster: go directive, pinned lint, gofmt enforcement, govulncheck | P1 | S | — | TODO |
 | 008 | Reconcile stale docs: backlog, DESIGN.md, README, phase comments, kill-climb caveat | P2 | S | 007 | TODO |
@@ -148,6 +148,23 @@ in different packages and don't conflict. Everything touching `internal/tui/tui.
   would otherwise misattribute to the wrong project, feeding wrong results
   into `whence kill <name>`). Three uncached re-runs, full lint/test gate,
   and `git status` cleanliness all independently confirmed.
+
+- **005 — DONE.** No drift, no reconciliation needed. Executed in worktree
+  branch `worktree-agent-a521178634bd607ff` (commit branch
+  `advisor/005-scan-row-correctness`), reviewed and approved 2026-07-09.
+  Added `model.IsAllInterfaces`/`IsLoopback`, delegated `docker.isAllInterfacesIP`
+  to it, extracted `scan.rowsFromConns` as a pure/testable function, and fixed
+  the dedup key to include the bind address (was `port/proto/pid`, now
+  `port/proto/address/pid`). `collapseIPv4IPv6` deliberately untouched —
+  verified it already routes through `Exposure()` (fixed upstream in Step 1),
+  so there was no raw address literal left to delegate; the dual-stack
+  collapse invariant (AGENTS.md) still holds. The executor's own sandbox
+  blocked its attempt to empirically verify the fix by reverting the key;
+  reviewer did that revert-and-check personally in the worktree and
+  reproduced the exact predicted failure (two distinct port-53 listeners
+  collapsing to one under the old key) before restoring. Three uncached
+  re-runs, full lint/test gate, both darwin+windows cross-compiles, and
+  `git status` cleanliness all independently confirmed.
 
 ## Findings considered and rejected (do not re-audit)
 
