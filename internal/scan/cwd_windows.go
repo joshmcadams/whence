@@ -18,3 +18,14 @@ func processCwd(pid int32) (string, error) {
 	}
 	return p.Cwd()
 }
+
+// processCwds resolves cwds pid-by-pid via gopsutil on Windows. Each per-pid
+// error is preserved in the result so enrich can write the usual cwd: notes.
+func processCwds(pids []int32) map[int32]cwdResult {
+	out := make(map[int32]cwdResult, len(pids))
+	for _, pid := range pids {
+		path, err := processCwd(pid)
+		out[pid] = cwdResult{path: path, err: err}
+	}
+	return out
+}

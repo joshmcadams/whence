@@ -238,3 +238,62 @@ func TestProcesses_PassesThroughNonTimeoutError(t *testing.T) {
 		t.Errorf("error = %q, want 'enumerate sockets:' prefix", err)
 	}
 }
+
+func TestProcesses_CwdResultMapFlowsIntoEnrich(t *testing.T) {
+	save := connections
+	defer func() { connections = save }()
+	connections = func(ctx context.Context, kind string) ([]gnet.ConnectionStat, error) {
+		return []gnet.ConnectionStat{
+			{Status: "LISTEN", Family: 2, Laddr: gnet.Addr{IP: "127.0.0.1", Port: 8080}, Pid: 42},
+			{Status: "LISTEN", Family: 2, Laddr: gnet.Addr{IP: "127.0.0.1", Port: 9090}, Pid: 99},
+			{Status: "LISTEN", Family: 2, Laddr: gnet.Addr{IP: "127.0.0.1", Port: 8081}, Pid: 42},
+		}, nil
+	}
+	servers, err := Processes()
+	if err != nil {
+		t.Fatalf("Processes: %v", err)
+	}
+	if len(servers) < 2 {
+		t.Fatalf("expected >= 2 servers, got %d", len(servers))
+	}
+	var p42 []model.Server
+	for _, s := range servers {
+		if s.PID == 42 {
+			p42 = append(p42, s)
+		}
+	}
+	if len(p42) != 2 {
+		t.Fatalf("expected 2 rows for pid 42, got %d", len(p42))
+	}
+	if p42[0].Cwd != p42[1].Cwd {
+		t.Errorf("pid 42 rows have different Cwd: %q vs %q — batch resolution should be once",
+			p42[0].Cwd, p42[1].Cwd)
+	}
+}
+
+func TestProcesses_CwdFailureBecomesNote(t *testing.T) {
+	save := connections
+	defer func() { connections = save }()
+	connections = func(ctx context.Context, kind string) ([]gnet.ConnectionStat, error) {
+		return []gnet.ConnectionStat{
+			{Status: "LISTEN", Family: 2, Laddr: gnet.Addr{IP: "127.0.0.1", Port: 9999}, Pid: 1},
+		}, nil
+	}
+	servers, err := Processes()
+	if err != nil {
+		t.Fatalf("Processes: %v", err)
+	}
+	if len(servers) != 1 {
+		t.Fatalf("expected 1 server, got %d", len(servers))
+	}
+	found := false
+	for _, n := range servers[0].Notes {
+		if strings.Contains(n, "cwd:") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected a cwd note, got notes=%v", servers[0].Notes)
+	}
+}

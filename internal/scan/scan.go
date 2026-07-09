@@ -40,7 +40,23 @@ func Processes() ([]model.Server, error) {
 		return nil, fmt.Errorf("enumerate sockets: %w", err)
 	}
 
-	servers := rowsFromConns(conns, time.Now(), enrich)
+	// Collect unique attributed pids for batched cwd resolution.
+	pidSet := map[int32]bool{}
+	for _, c := range conns {
+		if strings.ToUpper(c.Status) == "LISTEN" && c.Pid > 0 {
+			pidSet[c.Pid] = true
+		}
+	}
+	pids := make([]int32, 0, len(pidSet))
+	for pid := range pidSet {
+		pids = append(pids, pid)
+	}
+	cwds := processCwds(pids)
+
+	now := time.Now()
+	servers := rowsFromConns(conns, now, func(s *model.Server, pid int32, t time.Time) {
+		enrich(s, pid, t, cwds)
+	})
 	servers = collapseIPv4IPv6(servers)
 	sort.Slice(servers, func(i, j int) bool {
 		if servers[i].Port != servers[j].Port {
@@ -123,8 +139,17 @@ func collapseIPv4IPv6(servers []model.Server) []model.Server {
 	return out
 }
 
+// cwdResult pairs a resolved working directory with the per-pid error that
+// produced it. Used to batch cwd resolution while preserving per-row notes:
+// enrich writes a cwd: note when err is non-nil, and sets s.Cwd when path is
+// non-empty with no error.
+type cwdResult struct {
+	path string
+	err  error
+}
+
 // enrich fills process-level detail, accumulating non-fatal notes.
-func enrich(s *model.Server, pid int32, now time.Time) {
+func enrich(s *model.Server, pid int32, now time.Time, cwds map[int32]cwdResult) {
 	p, err := process.NewProcess(pid)
 	if err != nil {
 		s.Notes = append(s.Notes, "process: "+err.Error())
@@ -150,10 +175,12 @@ func enrich(s *model.Server, pid int32, now time.Time) {
 		s.StartTime = time.UnixMilli(ms)
 		s.Uptime = now.Sub(s.StartTime)
 	}
-	if cwd, err := processCwd(pid); err == nil && cwd != "" {
-		s.Cwd = cwd
-	} else if err != nil {
-		s.Notes = append(s.Notes, "cwd: "+err.Error())
+	if r, ok := cwds[pid]; ok {
+		if r.err != nil {
+			s.Notes = append(s.Notes, "cwd: "+r.err.Error())
+		} else if r.path != "" {
+			s.Cwd = r.path
+		}
 	}
 }
 

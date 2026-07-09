@@ -10,28 +10,50 @@ import (
 	"github.com/joshmcadams/whence/internal/execx"
 )
 
-// lsofTimeout bounds a single lsof call so one stuck process can't stall the
-// whole scan; on timeout the caller records it as a per-row note.
-const lsofTimeout = 2 * time.Second
+// lsofBatchTimeout bounds one batch lsof call over all process pids.
+const lsofBatchTimeout = 5 * time.Second
 
-// processCwd resolves a process's working directory on macOS, where gopsutil
-// does not implement Cwd(). We parse `lsof` field output:
+// processCwds resolves working directories for every given pid with a
+// single lsof call. lsof accepts comma-separated pids and -Fpn tags each
+// n line with its p pid, so one invocation replaces N sequential calls.
 //
-//	lsof -a -p <pid> -d cwd -Fn
-//
-// emits one line per field; the cwd path is the line beginning with 'n'.
-// NOTE: this makes lsof a runtime dependency on macOS (doctor reports it).
-// A cgo proc_pidinfo(PROC_PIDVNODEPATHINFO) implementation can replace this
-// later to drop the dependency.
-func processCwd(pid int32) (string, error) {
-	out, err := execx.Output(lsofTimeout, "lsof", "-a", "-p", fmt.Sprint(pid), "-d", "cwd", "-Fn")
-	if err != nil {
-		return "", fmt.Errorf("lsof: %w", err)
+// On error, stdout is still parsed (same partial-tolerance pattern: lsof
+// exits non-zero when ANY listed pid has no cwd fd, but the rest may
+// succeed). Only completely empty output is treated as a failure, recorded
+// as a note on every attributed row — never a scan abort.
+func processCwds(pids []int32) map[int32]cwdResult {
+	if len(pids) == 0 {
+		return nil
 	}
-	for _, line := range strings.Split(string(out), "\n") {
-		if strings.HasPrefix(line, "n") {
-			return strings.TrimPrefix(line, "n"), nil
+	pidStrs := make([]string, len(pids))
+	for i, pid := range pids {
+		pidStrs[i] = fmt.Sprint(pid)
+	}
+	pidList := strings.Join(pidStrs, ",")
+
+	out, err := execx.Output(lsofBatchTimeout, "lsof", "-a", "-p", pidList, "-d", "cwd", "-Fpn")
+
+	result := make(map[int32]cwdResult, len(pids))
+	parsed := parseLsofCwds(out)
+
+	for pid, path := range parsed {
+		result[pid] = cwdResult{path: path}
+	}
+
+	if err != nil && len(parsed) == 0 {
+		batchErr := fmt.Errorf("lsof: %w", err)
+		for _, pid := range pids {
+			if _, seen := result[pid]; !seen {
+				result[pid] = cwdResult{err: batchErr}
+			}
+		}
+	} else {
+		for _, pid := range pids {
+			if _, seen := result[pid]; !seen {
+				result[pid] = cwdResult{err: fmt.Errorf("not reported by lsof")}
+			}
 		}
 	}
-	return "", fmt.Errorf("cwd not found in lsof output")
+
+	return result
 }
