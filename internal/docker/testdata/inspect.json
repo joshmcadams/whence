@@ -1,0 +1,58 @@
+[
+  {
+    "Name": "/jfdid-db-1",
+    "State": {
+      "StartedAt": "2026-07-01T12:34:56.789012345Z"
+    },
+    "Config": {
+      "Image": "postgres:16",
+      "Labels": {
+        "com.docker.compose.project": "jfdid",
+        "com.docker.compose.project.working_dir": "/home/me/dev/jfdid"
+      }
+    },
+    "NetworkSettings": {
+      "Ports": {
+        "5432/tcp": [
+          { "HostIp": "0.0.0.0", "HostPort": "5433" },
+          { "HostIp": "0.0.0.0", "HostPort": "" }
+        ],
+        "5432/udp": [
+          { "HostIp": "0.0.0.0", "HostPort": "5433" }
+        ]
+      }
+    }
+  },
+  {
+    "Name": "/k8s_something",
+    "State": {
+      "StartedAt": "2026-07-01T12:00:00Z"
+    },
+    "Config": {
+      "Image": "k8s.gcr.io/pause:3.9",
+      "Labels": {
+        "io.kubernetes.pod.name": "somepod"
+      }
+    },
+    "NetworkSettings": {
+      "Ports": {}
+    }
+  },
+  {
+    "Name": "/standalone",
+    "State": {
+      "StartedAt": "2026-07-01T09:15:30Z"
+    },
+    "Config": {
+      "Image": "redis:7",
+      "Labels": {}
+    },
+    "NetworkSettings": {
+      "Ports": {
+        "6379/tcp": [
+          { "HostIp": "::", "HostPort": "6379" }
+        ]
+      }
+    }
+  }
+]

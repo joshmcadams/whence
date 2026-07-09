@@ -61,6 +61,74 @@ func TestView_IgnorePorts(t *testing.T) {
 	}
 }
 
+func TestMerge_ClassicProxy(t *testing.T) {
+	// Root-owned docker-proxy listener (unattributed, PID<=0) mirrors the
+	// container's published port — suppressed.
+	dockers := []model.Server{{Port: 5433, Address: "0.0.0.0", Source: model.SourceDocker}}
+	procs := []model.Server{{Port: 5433, PID: 0, Address: "0.0.0.0"}}
+	got := merge(dockers, procs)
+	if len(got) != 1 || got[0].Source != model.SourceDocker {
+		t.Fatalf("merge = %+v, want only the docker row", got)
+	}
+}
+
+func TestMerge_PrivilegedProxyByName(t *testing.T) {
+	// Privileged scan attributes the proxy: PID>0 but name is docker-proxy —
+	// still suppressed.
+	dockers := []model.Server{{Port: 5433, Address: "0.0.0.0", Source: model.SourceDocker}}
+	procs := []model.Server{{Port: 5433, PID: 900, Name: "docker-proxy", Address: "0.0.0.0"}}
+	got := merge(dockers, procs)
+	if len(got) != 1 || got[0].Source != model.SourceDocker {
+		t.Fatalf("merge = %+v, want only the docker row", got)
+	}
+}
+
+func TestMerge_DistinctInterfaceSurvives(t *testing.T) {
+	// The fix: a container bound to loopback and a native listener on the
+	// same port number but a genuinely different interface both survive.
+	dockers := []model.Server{{Port: 8080, Address: "127.0.0.1", Source: model.SourceDocker}}
+	procs := []model.Server{{Port: 8080, PID: 4242, Name: "python3", Address: "192.168.1.5"}}
+	got := merge(dockers, procs)
+	if len(got) != 2 {
+		t.Fatalf("merge = %+v, want both rows to survive (fails against the old bare-port rule)", got)
+	}
+}
+
+func TestMerge_AllInterfacesContainerSuppressesAttributedNative(t *testing.T) {
+	// A container bound to all interfaces can't genuinely coexist with a
+	// same-port, same-exposure native listener; treat the native row as the
+	// proxy/mirror and suppress it even though it's attributed.
+	dockers := []model.Server{{Port: 9090, Address: "0.0.0.0", Source: model.SourceDocker}}
+	procs := []model.Server{{Port: 9090, PID: 555, Name: "someproc", Address: "0.0.0.0"}}
+	got := merge(dockers, procs)
+	if len(got) != 1 || got[0].Source != model.SourceDocker {
+		t.Fatalf("merge = %+v, want only the docker row", got)
+	}
+}
+
+func TestMerge_DisjointPortsPassThrough(t *testing.T) {
+	dockers := []model.Server{{Port: 5432, Address: "0.0.0.0", Source: model.SourceDocker}}
+	procs := []model.Server{{Port: 3000, PID: 111, Name: "node", Address: "127.0.0.1"}}
+	got := merge(dockers, procs)
+	if len(got) != 2 {
+		t.Fatalf("merge = %+v, want both rows (disjoint ports)", got)
+	}
+	if got[0].Source != model.SourceDocker || got[1].Port != 3000 {
+		t.Fatalf("merge order = %+v, want dockers first then procs", got)
+	}
+}
+
+func TestMerge_EmptyDockerSetPassesProcsThrough(t *testing.T) {
+	procs := []model.Server{
+		{Port: 3000, PID: 111, Name: "node"},
+		{Port: 4000, PID: 222, Name: "python3"},
+	}
+	got := merge(nil, procs)
+	if len(got) != 2 {
+		t.Fatalf("merge = %+v, want procs untouched", got)
+	}
+}
+
 func TestView_IgnoreNames(t *testing.T) {
 	// Case-insensitive match on the process name.
 	cfg := config.Config{ConfidenceThreshold: 50, IgnoreNames: []string{"SSHD"}}

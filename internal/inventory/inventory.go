@@ -35,20 +35,64 @@ func Collect(cfg config.Config) ([]model.Server, error) {
 
 	dockers := (<-dockerCh).servers
 
-	dockerPorts := make(map[int]bool, len(dockers))
+	return merge(dockers, procs), nil
+}
+
+// merge combines docker and native rows. A native row is suppressed only when
+// it is docker's own listener for a published port: same port AND either
+// (a) the row names the docker proxy machinery, (b) the row is unattributed
+// (PID ≤ 0 — the root-owned proxy in an unprivileged scan), or (c) the
+// container binding covers the native row's address (same exposure class,
+// or the container is bound to all interfaces). A native listener on a
+// genuinely different interface than the container survives.
+func merge(dockers, procs []model.Server) []model.Server {
+	byPort := make(map[int][]model.Server, len(dockers))
 	for _, d := range dockers {
-		dockerPorts[d.Port] = true
+		byPort[d.Port] = append(byPort[d.Port], d)
 	}
 
 	merged := make([]model.Server, 0, len(procs)+len(dockers))
 	merged = append(merged, dockers...)
 	for _, p := range procs {
-		if dockerPorts[p.Port] {
+		suppressed := false
+		for _, d := range byPort[p.Port] {
+			if isDockerProxyName(p) || p.PID <= 0 || d.Exposure() == "all" || d.Exposure() == p.Exposure() {
+				suppressed = true
+				break
+			}
+		}
+		if suppressed {
 			continue
 		}
 		merged = append(merged, p)
 	}
-	return merged, nil
+	return merged
+}
+
+// isDockerProxyName reports whether a server's name or executable basename
+// identifies it as docker's own port-forwarding machinery rather than a
+// genuine dev process: the Linux userland proxy, Docker Desktop's backend
+// processes, or rootless Docker's port forwarder.
+func isDockerProxyName(s model.Server) bool {
+	exeBase := baseName(s.Exe)
+	if s.Name == "docker-proxy" || exeBase == "docker-proxy" {
+		return true
+	}
+	if s.Name == "rootlesskit" || exeBase == "rootlesskit" {
+		return true
+	}
+	return strings.HasPrefix(s.Name, "com.docker.") || strings.HasPrefix(exeBase, "com.docker.")
+}
+
+// baseName returns the final path element of exe, or "" if exe is empty.
+func baseName(exe string) string {
+	if exe == "" {
+		return ""
+	}
+	if i := strings.LastIndexAny(exe, `/\`); i >= 0 {
+		return exe[i+1:]
+	}
+	return exe
 }
 
 // View applies the shared display filters: confidence (unless all), an optional

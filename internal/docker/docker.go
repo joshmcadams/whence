@@ -181,22 +181,31 @@ func isAllInterfacesIP(ip string) bool {
 	return model.IsAllInterfaces(ip)
 }
 
+// dockerOutput seams the exec call so tests can simulate exit codes/stdout
+// without a real docker daemon.
+var dockerOutput = execx.Output
+
 func runningIDs() ([]string, error) {
-	out, err := execx.Output(dockerTimeout, "docker", "ps", "-q", "--no-trunc")
+	out, err := dockerOutput(dockerTimeout, "docker", "ps", "-q", "--no-trunc")
 	if err != nil {
 		return nil, err
 	}
 	return strings.Fields(string(out)), nil
 }
 
+// inspectAll parses stdout even when the command exited non-zero: a
+// container that exits between `docker ps -q` and this call makes `docker
+// inspect` exit 1, but it still prints the JSON array of the containers it
+// did find on stdout (errors go to stderr). Treat that as a partial success
+// rather than discarding every row for the cycle.
 func inspectAll(ids []string) ([]inspect, error) {
 	args := append([]string{"inspect"}, ids...)
-	out, err := execx.Output(dockerTimeout, "docker", args...)
-	if err != nil {
-		return nil, err
-	}
+	out, err := dockerOutput(dockerTimeout, "docker", args...)
 	var containers []inspect
-	if err := json.Unmarshal(out, &containers); err != nil {
+	if jsonErr := json.Unmarshal(out, &containers); jsonErr == nil && len(containers) > 0 {
+		return containers, nil // partial success: some ids resolved before exit 1
+	}
+	if err != nil {
 		return nil, err
 	}
 	return containers, nil

@@ -1,8 +1,12 @@
 package docker
 
 import (
+	"encoding/json"
+	"errors"
+	"os"
 	"sort"
 	"testing"
+	"time"
 )
 
 func TestHostPorts_DedupesV4V6AndSkipsUDP(t *testing.T) {
@@ -77,6 +81,126 @@ func TestClassifyContainer(t *testing.T) {
 	bare.Name = "/redis"
 	if proj, conf := classifyContainer(bare); proj != nil || conf != confContainer {
 		t.Errorf("bare container: proj=%+v conf=%d", proj, conf)
+	}
+}
+
+func withDockerOutput(t *testing.T, fn func(timeout time.Duration, name string, args ...string) ([]byte, error)) {
+	orig := dockerOutput
+	dockerOutput = fn
+	t.Cleanup(func() { dockerOutput = orig })
+}
+
+func TestInspectAll_PartialSuccessOnNonZeroExit(t *testing.T) {
+	// docker inspect exits 1 because one id vanished, but still printed the
+	// JSON array of the containers it did find on stdout.
+	valid := []byte(`[{"Name":"/found"}]`)
+	withDockerOutput(t, func(timeout time.Duration, name string, args ...string) ([]byte, error) {
+		return valid, errors.New("exit status 1")
+	})
+
+	got, err := inspectAll([]string{"found", "gone"})
+	if err != nil {
+		t.Fatalf("err = %v, want nil (partial success)", err)
+	}
+	if len(got) != 1 || got[0].Name != "/found" {
+		t.Fatalf("got = %+v, want one container named /found", got)
+	}
+}
+
+func TestInspectAll_EmptyOutputPropagatesError(t *testing.T) {
+	// A real timeout or daemon failure yields empty/invalid stdout; the
+	// error path must be preserved.
+	wantErr := errors.New("docker timed out after 5s")
+	withDockerOutput(t, func(timeout time.Duration, name string, args ...string) ([]byte, error) {
+		return nil, wantErr
+	})
+
+	got, err := inspectAll([]string{"x"})
+	if err == nil {
+		t.Fatal("err = nil, want propagated error")
+	}
+	if got != nil {
+		t.Fatalf("got = %+v, want nil", got)
+	}
+}
+
+func TestInspectAll_AllIDsUnknownPropagatesError(t *testing.T) {
+	// An all-ids-unknown run prints "[]" (empty slice) and exits non-zero —
+	// falls through to the error path, not treated as success.
+	wantErr := errors.New("exit status 1")
+	withDockerOutput(t, func(timeout time.Duration, name string, args ...string) ([]byte, error) {
+		return []byte(`[]`), wantErr
+	})
+
+	got, err := inspectAll([]string{"gone"})
+	if err == nil {
+		t.Fatal("err = nil, want propagated error")
+	}
+	if got != nil {
+		t.Fatalf("got = %+v, want nil", got)
+	}
+}
+
+func TestInspectAll_NormalPathOnSuccess(t *testing.T) {
+	valid := []byte(`[{"Name":"/a"},{"Name":"/b"}]`)
+	withDockerOutput(t, func(timeout time.Duration, name string, args ...string) ([]byte, error) {
+		return valid, nil
+	})
+
+	got, err := inspectAll([]string{"a", "b"})
+	if err != nil {
+		t.Fatalf("err = %v, want nil", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("got = %+v, want 2 containers", got)
+	}
+}
+
+// TestInspectJSONContract exercises the real `inspect` JSON tags against a
+// fixture shaped like real `docker inspect` output, so a wrong tag (e.g.
+// HostIp vs HostIP) fails here instead of only in production.
+func TestInspectJSONContract(t *testing.T) {
+	raw, err := os.ReadFile("testdata/inspect.json")
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	var containers []inspect
+	if err := json.Unmarshal(raw, &containers); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if len(containers) != 3 {
+		t.Fatalf("got %d containers, want 3", len(containers))
+	}
+	c1, c2, c3 := containers[0], containers[1], containers[2]
+
+	if !isKubernetes(c2) {
+		t.Errorf("isKubernetes(c2) = false, want true")
+	}
+
+	hp := hostPorts(c1)
+	if len(hp) != 1 {
+		t.Fatalf("hostPorts(c1) = %+v, want exactly one entry", hp)
+	}
+	if hp[0].port != 5433 || hp[0].proto != "tcp" || hp[0].address != "0.0.0.0" {
+		t.Errorf("hostPorts(c1)[0] = %+v, want {5433 tcp 0.0.0.0}", hp[0])
+	}
+
+	// c3's ipv6 all-interfaces bind ("::") normalizes to "0.0.0.0".
+	hp3 := hostPorts(c3)
+	if len(hp3) != 1 || hp3[0].address != "0.0.0.0" {
+		t.Errorf("hostPorts(c3) = %+v, want one entry with address 0.0.0.0", hp3)
+	}
+
+	if parseTime(c1.State.StartedAt).IsZero() {
+		t.Error("parseTime(c1.State.StartedAt) is zero, want non-zero")
+	}
+	if !parseTime("garbage").IsZero() {
+		t.Error("parseTime(\"garbage\") is non-zero, want zero")
+	}
+
+	proj, conf := classifyContainer(c1)
+	if proj == nil || proj.Name != "jfdid" || proj.Marker != "docker-compose" {
+		t.Fatalf("classifyContainer(c1) = %+v, %d; want project named jfdid, marker docker-compose", proj, conf)
 	}
 }
 
