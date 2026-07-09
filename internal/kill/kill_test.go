@@ -83,6 +83,47 @@ func TestPlanTree_ClimbsAndIncludesSiblings(t *testing.T) {
 	}
 }
 
+func TestClimbCycle_DoesNotHang(t *testing.T) {
+	// A ppid cycle between two launcher-named pids: 100 -> 200 -> 100. Both
+	// named "npm" so the launcher check alone would loop forever without a
+	// visited-set guard.
+	tbl := table(
+		map[int]int{100: 200, 200: 100},
+		map[int]string{100: "npm", 200: "npm"},
+	)
+	done := make(chan int, 1)
+	go func() { done <- climb(100, tbl) }()
+	select {
+	case got := <-done:
+		if got != 100 && got != 200 {
+			t.Errorf("climb = %d, want one of the cycle members (100 or 200)", got)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("climb did not return within 5s — cycle guard missing")
+	}
+}
+
+func TestSubtreeCycle_DoesNotHangAndDedupes(t *testing.T) {
+	// A child-link cycle: 100 <-> 200 (each lists the other as a child).
+	tbl := procTable{
+		ppid:     map[int]int{},
+		name:     map[int]string{100: "npm", 200: "npm"},
+		children: map[int][]int{100: {200}, 200: {100}},
+	}
+	done := make(chan []int, 1)
+	go func() { done <- subtree(100, tbl) }()
+	select {
+	case got := <-done:
+		sort.Ints(got)
+		want := []int{100, 200}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("subtree = %v, want %v (each pid exactly once)", got, want)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("subtree did not return within 5s — cycle guard missing")
+	}
+}
+
 func TestSubtree(t *testing.T) {
 	tbl := table(
 		map[int]int{200: 100, 300: 200, 400: 300, 500: 200},

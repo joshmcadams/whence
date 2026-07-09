@@ -260,9 +260,12 @@ func planTree(pid int, single bool, t procTable) []int {
 }
 
 // climb walks up through launcher wrappers to the tree head, stopping before
-// any non-launcher (notably shells) and before init.
+// any non-launcher (notably shells) and before init. seen guards against a
+// ppid cycle (possible from mid-snapshot PID reuse, or stale ppids on
+// Windows) turning this into an infinite loop.
 func climb(pid int, t procTable) int {
 	cur := pid
+	seen := map[int]bool{cur: true}
 	for {
 		pp, ok := t.ppid[cur]
 		if !ok || pp <= 1 {
@@ -271,19 +274,30 @@ func climb(pid int, t procTable) int {
 		if !launchers[t.name[pp]] {
 			break
 		}
+		if seen[pp] {
+			break // cycle: pp already visited, stop climbing here
+		}
+		seen[pp] = true
 		cur = pp
 	}
 	return cur
 }
 
-// subtree returns root plus all its descendants (BFS).
+// subtree returns root plus all its descendants (BFS). seen guards against a
+// cycle in the process table's child links so no pid is enqueued twice and
+// the walk always terminates.
 func subtree(root int, t procTable) []int {
 	out := []int{root}
+	seen := map[int]bool{root: true}
 	queue := []int{root}
 	for len(queue) > 0 {
 		cur := queue[0]
 		queue = queue[1:]
 		for _, c := range t.children[cur] {
+			if seen[c] {
+				continue
+			}
+			seen[c] = true
 			out = append(out, c)
 			queue = append(queue, c)
 		}
