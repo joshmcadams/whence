@@ -26,7 +26,7 @@ Repo ground rules that apply to EVERY plan (from `AGENTS.md`):
 | 005 | Scan row correctness: address-aware dedup, `*` exposure, extraction for tests | P1 | M | — | DONE |
 | 006 | Inventory merge correctness + docker JSON contract tests | P1 | M | — | DONE |
 | 007 | Toolchain/CI cluster: go directive, pinned lint, gofmt enforcement, govulncheck | P1 | S | — | DONE |
-| 008 | Reconcile stale docs: backlog, DESIGN.md, README, phase comments, kill-climb caveat | P2 | S | 007 | TODO |
+| 008 | Reconcile stale docs: backlog, DESIGN.md, README, phase comments, kill-climb caveat | P2 | S | 007 | DONE |
 | 009 | TUI refresh integrity: in-flight guard + snapshot generation counter | P2 | S | — | TODO |
 | 010 | Harden attribution inputs: bounded file reads, compose workdir validation, `--` separators | P2 | S | — | TODO |
 | 011 | Release pipeline hardening: CI permissions, SHA-pinned actions, reproducible releases | P2 | S | — | TODO |
@@ -205,6 +205,28 @@ in different packages and don't conflict. Everything touching `internal/tui/tui.
   validated against an already-installed golangci-lint v2.11.4 rather than
   the newly-pinned v2.12.2 (none newer was on this box) — config syntax is
   proven valid; CI's action will fetch the actual pinned version.
+
+- **008 — DONE.** Reconciled before dispatch: two of the plan's own citations
+  (config.go's exact Phase-comment line numbers) were off by 1-2 lines from a
+  miscitation when the plan was written, not drift — corrected in the
+  dispatch note rather than editing the plan file. More importantly, the
+  plan's done-criterion `git diff caec51a..HEAD -- '*.go'` shows comment-only
+  changes is stale by construction now that plans 001-007 have landed real
+  code changes since `caec51a` — reviewer redirected the executor to check
+  its own commit's diff against its branch point, not the full history.
+  Executed in worktree branch `worktree-agent-a6faf14269ba7e829` (commit
+  branch `advisor/008-docs-reconcile`), reviewed and approved 2026-07-09.
+  Backlog statuses reconciled with real commit SHAs (reviewer independently
+  verified all five citations against `git log`); DESIGN.md gained a
+  historical banner; README documents three previously-undocumented flags
+  (verified to genuinely exist); stale "Phase N" comments removed from
+  three files (reviewer confirmed every changed line in all three is a
+  comment, no logic touched); the npm-climb caveat in both AGENTS.md files
+  was rewritten accurately. Reviewer independently reproduced the npm
+  process-tree claim with `pstree` (`npm run dev → sh → sleep`, confirming
+  climb correctly stops at the interposed shell). One harmless leftover
+  scratch file from the executor's own verification experiment was found
+  and cleaned up in review — no repo or process impact.
 
 ## Findings considered and rejected (do not re-audit)
 
