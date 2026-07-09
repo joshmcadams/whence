@@ -2,6 +2,7 @@
 package scan
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -14,12 +15,28 @@ import (
 	"github.com/joshmcadams/whence/internal/model"
 )
 
+// scanTimeout bounds the socket enumeration. On darwin gopsutil shells out
+// to lsof for this (not just for cwd), and a wedged lsof must time out
+// rather than hang every command — the same rule execx enforces for our own
+// shell-outs. On linux/windows the enumeration is syscalls and never
+// approaches this.
+const scanTimeout = 10 * time.Second
+
+// connections is the socket-enumeration function, wrapped so tests on linux
+// can verify the context plumbing without real lsof.
+var connections = gnet.ConnectionsWithContext
+
 // Processes scans all listening TCP sockets and returns one Server per
 // (port, proto, address, pid). Errors fetching details for an individual
 // process are recorded in Server.Notes rather than aborting the whole scan.
 func Processes() ([]model.Server, error) {
-	conns, err := gnet.Connections("inet")
+	ctx, cancel := context.WithTimeout(context.Background(), scanTimeout)
+	defer cancel()
+	conns, err := connections(ctx, "inet")
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("enumerate sockets: timed out after %s: %w", scanTimeout, err)
+		}
 		return nil, fmt.Errorf("enumerate sockets: %w", err)
 	}
 

@@ -1,6 +1,9 @@
 package scan
 
 import (
+	"context"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -199,5 +202,39 @@ func TestProtoOf(t *testing.T) {
 		if got := protoOf(tc.family); got != tc.want {
 			t.Errorf("protoOf(%d) = %q, want %q", tc.family, got, tc.want)
 		}
+	}
+}
+
+func TestProcesses_TimeoutWrap(t *testing.T) {
+	save := connections
+	defer func() { connections = save }()
+	connections = func(ctx context.Context, kind string) ([]gnet.ConnectionStat, error) {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	_, err := Processes()
+	if err == nil {
+		t.Fatal("expected an error from a timed-out scan")
+	}
+	if !strings.Contains(err.Error(), "timed out after") {
+		t.Errorf("error = %q, want it to contain 'timed out after'", err)
+	}
+}
+
+func TestProcesses_PassesThroughNonTimeoutError(t *testing.T) {
+	save := connections
+	defer func() { connections = save }()
+	connections = func(ctx context.Context, kind string) ([]gnet.ConnectionStat, error) {
+		return nil, errors.New("lsof: command not found")
+	}
+	_, err := Processes()
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	if strings.Contains(err.Error(), "timed out") {
+		t.Errorf("non-timeout error must not carry 'timed out': %q", err)
+	}
+	if !strings.Contains(err.Error(), "enumerate sockets:") {
+		t.Errorf("error = %q, want 'enumerate sockets:' prefix", err)
 	}
 }
