@@ -62,14 +62,16 @@ func TestHostPorts_CapturesAddress(t *testing.T) {
 }
 
 func TestClassifyContainer(t *testing.T) {
+	workdir := t.TempDir()
+
 	var c inspect
 	c.Name = "/jfdid-db-1"
 	c.Config.Labels = map[string]string{
 		"com.docker.compose.project":             "jfdid",
-		"com.docker.compose.project.working_dir": "/home/me/dev/jfdid",
+		"com.docker.compose.project.working_dir": workdir,
 	}
 	proj, conf := classifyContainer(c)
-	if proj == nil || proj.Name != "jfdid" || proj.Root != "/home/me/dev/jfdid" {
+	if proj == nil || proj.Name != "jfdid" || proj.Root != workdir || proj.Marker != "docker-compose" {
 		t.Fatalf("project = %+v", proj)
 	}
 	if conf != confCompose {
@@ -81,6 +83,61 @@ func TestClassifyContainer(t *testing.T) {
 	bare.Name = "/redis"
 	if proj, conf := classifyContainer(bare); proj != nil || conf != confContainer {
 		t.Errorf("bare container: proj=%+v conf=%d", proj, conf)
+	}
+}
+
+// TestClassifyContainer_WorkdirMustExistLocally guards against label
+// name-squatting: a compose working_dir label is an arbitrary string any
+// container can carry, so attribution must be denied unless it resolves to a
+// real directory on this machine.
+func TestClassifyContainer_WorkdirMustExistLocally(t *testing.T) {
+	cases := []struct {
+		name    string
+		workdir string
+	}{
+		{"nonexistent absolute path", "/nonexistent/xyz"},
+		{"relative path", "../../etc"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var c inspect
+			c.Name = "/spoofed-1"
+			c.Config.Labels = map[string]string{
+				"com.docker.compose.project":             "spoofed",
+				"com.docker.compose.project.working_dir": tc.workdir,
+			}
+			proj, conf := classifyContainer(c)
+			if proj != nil {
+				t.Errorf("project = %+v, want nil", proj)
+			}
+			if conf != confContainer {
+				t.Errorf("conf = %d, want %d", conf, confContainer)
+			}
+		})
+	}
+}
+
+func TestIsLocalDir(t *testing.T) {
+	real := t.TempDir()
+	if !isLocalDir(real) {
+		t.Errorf("isLocalDir(%q) = false, want true", real)
+	}
+	if isLocalDir("/nonexistent/xyz") {
+		t.Error("isLocalDir(nonexistent) = true, want false")
+	}
+	if isLocalDir("../../etc") {
+		t.Error("isLocalDir(relative) = true, want false")
+	}
+	if isLocalDir("") {
+		t.Error("isLocalDir(empty) = true, want false")
+	}
+	// A file, not a directory, must also be rejected.
+	file := real + string(os.PathSeparator) + "f"
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if isLocalDir(file) {
+		t.Error("isLocalDir(regular file) = true, want false")
 	}
 }
 
@@ -198,9 +255,19 @@ func TestInspectJSONContract(t *testing.T) {
 		t.Error("parseTime(\"garbage\") is non-zero, want zero")
 	}
 
+	// Confirm the fixture still carries the compose labels this JSON contract
+	// depends on (a label-tag regression would silently zero this out).
+	if got := c1.Config.Labels["com.docker.compose.project.working_dir"]; got != "/home/me/dev/jfdid" {
+		t.Fatalf("c1 working_dir label = %q, want /home/me/dev/jfdid", got)
+	}
+	// That working_dir does not exist on the machine running this test, so
+	// classifyContainer correctly denies compose attribution (see
+	// TestClassifyContainer for the real-directory success path and
+	// TestClassifyContainer_WorkdirMustExistLocally for the nonexistent-path
+	// guard this exercises incidentally).
 	proj, conf := classifyContainer(c1)
-	if proj == nil || proj.Name != "jfdid" || proj.Marker != "docker-compose" {
-		t.Fatalf("classifyContainer(c1) = %+v, %d; want project named jfdid, marker docker-compose", proj, conf)
+	if proj != nil || conf != confContainer {
+		t.Fatalf("classifyContainer(c1) = %+v, %d; want nil project, confContainer (fixture working_dir doesn't exist on this machine)", proj, conf)
 	}
 }
 

@@ -128,6 +128,39 @@ func TestName_FallsBackToDirBasename(t *testing.T) {
 	}
 }
 
+func TestReadSmallFile_OversizedRejected(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "go.mod")
+	big := make([]byte, maxManifestBytes+1)
+	for i := range big {
+		big[i] = 'a'
+	}
+	writeFile(t, path, string(big))
+
+	if got := goModule(path); got != "" {
+		t.Errorf("goModule on oversized file = %q, want empty", got)
+	}
+	if _, ok := readSmallFile(path); ok {
+		t.Error("readSmallFile on oversized file: got ok=true, want false")
+	}
+}
+
+func TestReadSmallFile_SymlinkToManifestRejected(t *testing.T) {
+	root := t.TempDir()
+	real := filepath.Join(root, "real-go.mod")
+	writeFile(t, real, "module github.com/me/widget\n\ngo 1.26\n")
+	link := filepath.Join(root, "go.mod")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skipf("symlinks unsupported: %v", err)
+	}
+
+	// Lstat rejects the symlink even though it points at a valid manifest —
+	// an accepted behavior change (see readSmallFile's doc comment).
+	if got := goModule(link); got != "" {
+		t.Errorf("goModule via symlink = %q, want empty (symlinks rejected)", got)
+	}
+}
+
 func TestCache_SameRootReturnsSamePointer(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o755); err != nil {

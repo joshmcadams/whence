@@ -494,7 +494,7 @@ func TestDockerStop_SuccessUsesTimeoutAndArgs(t *testing.T) {
 	if got.name != "docker" {
 		t.Errorf("binary = %q, want docker", got.name)
 	}
-	wantArgs := []string{"stop", "-t", "7", "web-1"}
+	wantArgs := []string{"stop", "-t", "7", "--", "web-1"}
 	if !reflect.DeepEqual(got.args, wantArgs) {
 		t.Errorf("args = %v, want %v", got.args, wantArgs)
 	}
@@ -515,7 +515,7 @@ func TestDockerStop_ZeroTimeoutClampsToFive(t *testing.T) {
 	if res.Err != nil || !res.Killed {
 		t.Fatalf("Killed=%v Err=%v, want success", res.Killed, res.Err)
 	}
-	wantArgs := []string{"stop", "-t", "5", "web-1"}
+	wantArgs := []string{"stop", "-t", "5", "--", "web-1"}
 	if !reflect.DeepEqual(got.args, wantArgs) {
 		t.Errorf("args = %v, want %v", got.args, wantArgs)
 	}
