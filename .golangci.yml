@@ -11,3 +11,7 @@ linters:
         - fmt.Fprintf
         - fmt.Fprintln
         - (*text/tabwriter.Writer).Flush
+
+formatters:
+  enable:
+    - gofmt
