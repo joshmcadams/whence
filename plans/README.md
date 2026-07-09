@@ -40,7 +40,7 @@ Repo ground rules that apply to EVERY plan (from `AGENTS.md`):
 | 019 | Expose built-but-hidden surfaces: detail-view tree, list query, TUI sort, multi-target kill | P2 | M | 013, 017 | TODO (refreshed 2026-07-09 @ 65bc564 — line numbers + keymap excerpt) |
 | 020 | `whence config --edit` | P3 | S | — | TODO (excerpts drifted; reconcilable) |
 | 021 | Podman fallback for the container detection path | P3 | M | 006, 010 | TODO (minor drift in kill.go; reconcilable) |
-| 022 | Migrate the TUI stack to charmbracelet v2 | P3 | M | 009, 013, 014, 017, 019 | BLOCKED (depends on 014, 017, 019) |
+| 022 | Migrate the TUI stack to charmbracelet v2 | P3 | M | 009, 013, 014, 017, 019 | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale).
