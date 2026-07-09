@@ -30,7 +30,7 @@ Repo ground rules that apply to EVERY plan (from `AGENTS.md`):
 | 009 | TUI refresh integrity: in-flight guard + snapshot generation counter | P2 | S | — | DONE |
 | 010 | Harden attribution inputs: bounded file reads, compose workdir validation, `--` separators | P2 | S | — | DONE |
 | 011 | Release pipeline hardening: CI permissions, SHA-pinned actions, reproducible releases | P2 | S | — | DONE |
-| 012 | Stable sorts and `--watch` input validation | P2 | S | — | TODO |
+| 012 | Stable sorts and `--watch` input validation | P2 | S | — | DONE |
 | 013 | Remaining test seams: TUI preview, classify orchestration, CLI layer | P2 | M | 001 | TODO |
 | 014 | Single source of truth for row rendering and server descriptions (CLI + TUI) | P2 | M | 003 | TODO |
 | 015 | Cleanup sweep: dead code, config.Path build tags, error idioms | P3 | S | 013 | TODO |
@@ -303,6 +303,26 @@ in different packages and don't conflict. Everything touching `internal/tui/tui.
   same "1 configuration file(s) validated" result; all three touched YAML
   files parse cleanly via a real parser. Full lint/test gate and `git status`
   cleanliness independently confirmed.
+
+- **012 — DONE.** Only unrelated drift (plan 006's earlier insertions in
+  `inventory.go` pushed `Sort` down from lines 117-132 to 162-176 with zero
+  content change; `list.go` had zero drift), no reconciliation needed beyond
+  a heads-up note. Executed in worktree branch
+  `worktree-agent-a0c55e258cde7330d` (commit branch
+  `advisor/012-stable-sort-watch`), reviewed and approved 2026-07-09.
+  `Sort` now uses `sort.SliceStable` with a full tiebreak chain
+  (port/proto/address/pid/name) for all three keys; `--watch` validation
+  (reject `--json` combo, reject sub-500ms intervals) folded into the
+  existing `if o.watch` block in `runListWith`. Reviewer traced the
+  restructuring by hand through all four `watch`/`json`/`interval`
+  combinations and confirmed it's behavior-identical to the old code for
+  the valid cases. Reviewer also reverted `Sort` to the old unstable
+  `sort.Slice` and ran the three new permutation-stability tests five times
+  — all three failed reliably every run, proving they're genuinely
+  discriminating rather than vacuous — then reproduced both manual CLI
+  smoke tests independently against a freshly built binary. Three uncached
+  re-runs, full lint/test gate, and `git status` cleanliness all
+  independently confirmed.
 
 ## Findings considered and rejected (do not re-audit)
 
