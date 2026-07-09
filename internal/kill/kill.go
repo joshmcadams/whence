@@ -220,7 +220,7 @@ func dockerStop(s model.Server, o Opts) Result {
 	// `docker stop` waits up to `secs` for a graceful stop; bound the CLI call
 	// itself beyond that so a wedged daemon can't hang the kill forever.
 	timeout := time.Duration(secs)*time.Second + 10*time.Second
-	if out, err := dockerCombinedOutput(timeout, "docker", "stop", "-t", strconv.Itoa(secs), s.Name); err != nil {
+	if out, err := dockerCombinedOutput(timeout, "docker", "stop", "-t", strconv.Itoa(secs), "--", s.Name); err != nil {
 		return Result{Server: s, Method: "docker stop", Err: fmt.Errorf("%v: %s", err, out)}
 	}
 	return Result{Server: s, Killed: true, Method: "docker stop"}

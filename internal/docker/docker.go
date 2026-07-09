@@ -4,7 +4,9 @@ package docker
 
 import (
 	"encoding/json"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -99,7 +101,7 @@ func Servers() ([]model.Server, error) {
 func classifyContainer(c inspect) (*model.Project, int) {
 	labels := c.Config.Labels
 	workdir := labels["com.docker.compose.project.working_dir"]
-	if workdir == "" {
+	if workdir == "" || !isLocalDir(workdir) {
 		return nil, confContainer
 	}
 	name := labels["com.docker.compose.project"]
@@ -112,6 +114,23 @@ func classifyContainer(c inspect) (*model.Project, int) {
 		Description: project.Description(workdir),
 		Marker:      "docker-compose",
 	}, confCompose
+}
+
+// isLocalDir reports whether p is an absolute path to a directory that
+// exists on this machine. The compose working_dir label is an arbitrary
+// string any container can carry — this is the spoof-resistance floor for
+// granting compose attribution (confidence 80): the label must point at a
+// real directory here, not just anywhere. It deliberately does not check
+// IsUnderDevRoot (compose projects outside dev roots are legitimate) and
+// uses Stat, not Lstat (a compose project checked out via a symlinked path
+// is legitimate — the guard's job is "does this resolve to a real
+// directory", which also naturally fails for containers built elsewhere).
+func isLocalDir(p string) bool {
+	if !filepath.IsAbs(p) {
+		return false
+	}
+	fi, err := os.Stat(p)
+	return err == nil && fi.IsDir()
 }
 
 func isKubernetes(c inspect) bool {
@@ -199,7 +218,7 @@ func runningIDs() ([]string, error) {
 // did find on stdout (errors go to stderr). Treat that as a partial success
 // rather than discarding every row for the cycle.
 func inspectAll(ids []string) ([]inspect, error) {
-	args := append([]string{"inspect"}, ids...)
+	args := append([]string{"inspect", "--"}, ids...)
 	out, err := dockerOutput(dockerTimeout, "docker", args...)
 	var containers []inspect
 	if jsonErr := json.Unmarshal(out, &containers); jsonErr == nil && len(containers) > 0 {

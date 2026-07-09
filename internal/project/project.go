@@ -137,9 +137,32 @@ func Description(root string) string {
 
 // --- manifest parsers -------------------------------------------------------
 
-func jsonField(path, field string) string {
+// maxManifestBytes bounds any single attribution read. Real manifests and
+// READMEs are tiny; the cap defends against reading a huge or non-regular
+// file (e.g. a FIFO, which would block forever) chosen by an untrusted
+// process cwd or docker compose label.
+const maxManifestBytes = 1 << 20 // 1 MiB
+
+// readSmallFile reads path only if Lstat reports a regular file no larger
+// than maxManifestBytes. Using Lstat (not Stat) means a symlink is rejected
+// even when it points at a legitimate manifest/README — a small, accepted
+// behavior change (a symlinked README now yields no description) in
+// exchange for never following a link into something unbounded.
+func readSmallFile(path string) ([]byte, bool) {
+	fi, err := os.Lstat(path)
+	if err != nil || !fi.Mode().IsRegular() || fi.Size() > maxManifestBytes {
+		return nil, false
+	}
 	data, err := os.ReadFile(path)
-	if err != nil {
+	if err != nil || len(data) > maxManifestBytes {
+		return nil, false
+	}
+	return data, true
+}
+
+func jsonField(path, field string) string {
+	data, ok := readSmallFile(path)
+	if !ok {
 		return ""
 	}
 	var m map[string]any
@@ -153,8 +176,8 @@ func jsonField(path, field string) string {
 }
 
 func goModule(path string) string {
-	data, err := os.ReadFile(path)
-	if err != nil {
+	data, ok := readSmallFile(path)
+	if !ok {
 		return ""
 	}
 	for _, line := range strings.Split(string(data), "\n") {
@@ -188,8 +211,8 @@ type cargoLike struct {
 
 func parseToml(path string) (cargoLike, bool) {
 	var c cargoLike
-	data, err := os.ReadFile(path)
-	if err != nil {
+	data, ok := readSmallFile(path)
+	if !ok {
 		return c, false
 	}
 	if _, err := toml.Decode(string(data), &c); err != nil {
@@ -218,8 +241,8 @@ func tomlDescription(path string) string {
 // badges, images, and HTML.
 func readmeSummary(root string) string {
 	for _, n := range []string{"README.md", "README.markdown", "README.rst", "README.txt", "README"} {
-		data, err := os.ReadFile(filepath.Join(root, n))
-		if err != nil {
+		data, ok := readSmallFile(filepath.Join(root, n))
+		if !ok {
 			continue
 		}
 		for _, raw := range strings.Split(string(data), "\n") {
