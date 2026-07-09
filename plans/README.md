@@ -21,7 +21,7 @@ Repo ground rules that apply to EVERY plan (from `AGENTS.md`):
 |------|-------|----------|--------|------------|--------|
 | 001 | Characterization tests for the kill execution path | P1 | M | — | DONE (see note) |
 | 002 | Harden kill targeting: identity re-check, cycle guards, zombie-aware liveness | P1 | M | 001 | DONE |
-| 003 | Sanitize untrusted strings at every terminal render boundary | P1 | S | — | TODO |
+| 003 | Sanitize untrusted strings at every terminal render boundary | P1 | S | — | DONE |
 | 004 | Recognize `.git` files (worktrees/submodules) in project root detection | P1 | S | — | TODO |
 | 005 | Scan row correctness: address-aware dedup, `*` exposure, extraction for tests | P1 | M | — | TODO |
 | 006 | Inventory merge correctness + docker JSON contract tests | P1 | M | — | TODO |
@@ -114,6 +114,25 @@ in different packages and don't conflict. Everything touching `internal/tui/tui.
   worktree (caught immediately by the harness's isolation guard before any
   file changed, self-corrected); reviewer audited the shared tree's reflog and
   status afterward and confirmed no lasting effect.
+
+- **003 — DONE.** Reconciled against live code before dispatch (plan 001's
+  `io.Writer` extraction had shifted `internal/cli/kill.go` line numbers and
+  `printPlan`'s signature since this plan was written — excerpts refreshed,
+  no design change). Executed in worktree branch
+  `worktree-agent-af8de2c77ce5f87cf` (commit branch
+  `advisor/003-terminal-sanitize`), reviewed and approved 2026-07-09. Added
+  `output.Sanitize` (C0/DEL/C1 control runes → `?`) and applied it at every
+  render boundary in `output.Table`, `cli.describe`/`printPlan`, and
+  `tui.rebuild`/`confirmView`/`detailView`/`headerView`/`killedMsg`/`describe`.
+  `output.JSON` is untouched (diff-verified empty). Reviewer independently
+  hex-dumped the test file where the executor reported and fixed a tooling
+  artifact (a Go Unicode-escape literal for a C1 control byte that briefly
+  landed as a raw embedded byte during editing) — confirmed clean in the
+  committed source via hex dump. Reviewer also ran the
+  real binary against live `list --all` output on this machine to check for
+  tabwriter column breakage — none found. Three uncached re-runs of the
+  affected packages showed no flakiness; all test-file diffs are purely
+  additive (zero deletions).
 
 ## Findings considered and rejected (do not re-audit)
 
