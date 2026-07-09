@@ -36,16 +36,17 @@ type killOpts struct {
 func newKillCmd() *cobra.Command {
 	o := &killOpts{}
 	cmd := &cobra.Command{
-		Use:   "kill <port|name>",
-		Short: "Kill the server on a port, or all servers in a project",
+		Use:   "kill <port|name> [more...]",
+		Short: "Kill servers on one or more ports, or by project name",
 		Long: "Kill by port number (e.g. `whence kill 3000`) or by project/server name\n" +
-			"(e.g. `whence kill nexxus`). A name prefers an exact (case-insensitive)\n" +
-			"match and only falls back to substring when there is none. Native\n" +
-			"processes are killed as a tree (SIGTERM then SIGKILL); compose services\n" +
-			"are stopped via docker.",
-		Args: cobra.ExactArgs(1),
+			"(e.g. `whence kill nexxus`). Accepts multiple targets (e.g. `whence kill\n" +
+			"3000 5173`). A name prefers an exact (case-insensitive) match and only falls\n" +
+			"back to substring when there is none. If any target matches nothing the\n" +
+			"whole command fails before prompting. Native processes are killed as a tree\n" +
+			"(SIGTERM then SIGKILL); compose services are stopped via docker.",
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runKill(args[0], o)
+			return runKill(args, o)
 		},
 	}
 	f := cmd.Flags()
@@ -68,7 +69,7 @@ type killDeps struct {
 	errOut  io.Writer
 }
 
-func runKill(target string, o *killOpts) error {
+func runKill(targets []string, o *killOpts) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return err
@@ -77,7 +78,7 @@ func runKill(target string, o *killOpts) error {
 	if err != nil {
 		return err
 	}
-	return runKillWith(target, o, killDeps{
+	return runKillWith(targets, o, killDeps{
 		cfg:     cfg,
 		servers: servers,
 		kill:    kill.Server,
@@ -87,17 +88,30 @@ func runKill(target string, o *killOpts) error {
 	})
 }
 
-func runKillWith(target string, o *killOpts, d killDeps) error {
-	matches, fuzzy := matchTargets(d.servers, target)
-	if len(matches) == 0 {
-		return fmt.Errorf("no server found matching %q", target)
+func runKillWith(targets []string, o *killOpts, d killDeps) error {
+	var matches []model.Server
+	fuzzy := false
+	for _, target := range targets {
+		m, f := matchTargets(d.servers, target)
+		if len(m) == 0 {
+			return fmt.Errorf("no server found matching %q", target)
+		}
+		matches = append(matches, m...)
+		fuzzy = fuzzy || f
 	}
 	units := dedupeUnits(matches)
 
 	// Warn when --single is paired with a multi-unit name match: each listener
 	// is killed by PID alone, leaving the rest of its process tree running.
 	if o.single && len(units) > 1 {
-		if port, err := strconv.Atoi(target); err != nil || port <= 0 {
+		anyName := false
+		for _, t := range targets {
+			if port, err := strconv.Atoi(t); err != nil || port <= 0 {
+				anyName = true
+				break
+			}
+		}
+		if anyName {
 			fmt.Fprintf(d.errOut, "note: --single with %d matched targets kills only each listener pid, not its tree\n", len(units))
 		}
 	}
@@ -110,7 +124,7 @@ func runKillWith(target string, o *killOpts, d killDeps) error {
 
 	// Confirm unless forced, previewing the full tree each kill will signal.
 	if !o.force {
-		if !confirmKill(units, target, fuzzy, opts, d.out, d.in) {
+		if !confirmKill(units, targets, fuzzy, opts, d.out, d.in) {
 			fmt.Fprintln(d.out, "Aborted.")
 			return nil
 		}
@@ -200,17 +214,18 @@ func dedupeUnits(servers []model.Server) []model.Server {
 // the listening pid — then asks for confirmation. Because a kill climbs to a
 // launcher and takes the whole subtree, one listening server can mean several
 // processes; the user sees them all before agreeing.
-func confirmKill(units []model.Server, target string, fuzzy bool, opts kill.Opts, out io.Writer, in io.Reader) bool {
+func confirmKill(units []model.Server, targets []string, fuzzy bool, opts kill.Opts, out io.Writer, in io.Reader) bool {
 	plans := kill.PreviewBatch(units, opts)
 	totalProcs := 0
 	for _, p := range plans {
 		totalProcs += len(p.Tree)
 	}
 
+	targetStr := strings.Join(targets, ", ")
 	if fuzzy {
-		fmt.Fprintf(out, "No exact match for %q; %d server(s) contain it", target, len(units))
+		fmt.Fprintf(out, "No exact match for %q; %d server(s) contain it", targetStr, len(units))
 	} else {
-		fmt.Fprintf(out, "About to kill %d target(s) matching %q", len(units), target)
+		fmt.Fprintf(out, "About to kill %d target(s) matching %q", len(units), targetStr)
 	}
 	if totalProcs > 0 {
 		fmt.Fprintf(out, " — %d process(es) total", totalProcs)

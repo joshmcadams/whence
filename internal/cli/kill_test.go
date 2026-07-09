@@ -126,7 +126,7 @@ func TestRunKillWith_ForceSkipsConfirmation(t *testing.T) {
 		out:     &out,
 		errOut:  &errOut,
 	}
-	if err := runKillWith("3000", &killOpts{force: true}, d); err != nil {
+	if err := runKillWith([]string{"3000"}, &killOpts{force: true}, d); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(calls()) != 1 {
@@ -150,7 +150,7 @@ func TestRunKillWith_NonYesAnswerAborts(t *testing.T) {
 		out:     &out,
 		errOut:  &errOut,
 	}
-	err := runKillWith("3000", &killOpts{}, d)
+	err := runKillWith([]string{"3000"}, &killOpts{}, d)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestRunKillWith_EOFAborts(t *testing.T) {
 		out:     &out,
 		errOut:  &errOut,
 	}
-	err := runKillWith("3000", &killOpts{}, d)
+	err := runKillWith([]string{"3000"}, &killOpts{}, d)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -200,7 +200,7 @@ func TestRunKillWith_YesProceedsForEachUnit(t *testing.T) {
 		out:    &out,
 		errOut: &errOut,
 	}
-	if err := runKillWith("app", &killOpts{}, d); err != nil {
+	if err := runKillWith([]string{"app"}, &killOpts{}, d); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(calls()) != 2 {
@@ -218,7 +218,7 @@ func TestRunKillWith_ExactMatchWording(t *testing.T) {
 		out:     &out,
 		errOut:  &errOut,
 	}
-	if err := runKillWith("web-1", &killOpts{}, d); err != nil {
+	if err := runKillWith([]string{"web-1"}, &killOpts{}, d); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(out.String(), `About to kill 1 target(s) matching "web-1"`) {
@@ -236,7 +236,7 @@ func TestRunKillWith_FuzzyMatchWording(t *testing.T) {
 		out:     &out,
 		errOut:  &errOut,
 	}
-	if err := runKillWith("web", &killOpts{}, d); err != nil {
+	if err := runKillWith([]string{"web"}, &killOpts{}, d); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(out.String(), `No exact match for "web"`) {
@@ -259,7 +259,7 @@ func TestRunKillWith_FailureAggregation(t *testing.T) {
 		out:    &out,
 		errOut: &errOut,
 	}
-	err := runKillWith("app", &killOpts{}, d)
+	err := runKillWith([]string{"app"}, &killOpts{}, d)
 	if err == nil || err.Error() != "1 of 2 kill(s) failed" {
 		t.Errorf("err = %v, want %q", err, "1 of 2 kill(s) failed")
 	}
@@ -284,7 +284,7 @@ func TestRunKillWith_SingleMultiUnitWarning(t *testing.T) {
 		out:    &out,
 		errOut: &errOut,
 	}
-	if err := runKillWith("app", &killOpts{single: true}, d); err != nil {
+	if err := runKillWith([]string{"app"}, &killOpts{single: true}, d); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(errOut.String(), "note: --single with 2 matched targets") {
@@ -311,7 +311,7 @@ func TestRunKillWith_SanitizesEscapeSequences(t *testing.T) {
 		out:     &out,
 		errOut:  &errOut,
 	}
-	if err := runKillWith("3000", &killOpts{}, d); err != nil {
+	if err := runKillWith([]string{"3000"}, &killOpts{}, d); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if strings.ContainsRune(out.String(), 0x1b) {
@@ -324,12 +324,122 @@ func TestRunKillWith_SanitizesEscapeSequences(t *testing.T) {
 
 func TestNewKillCmd_WiresFlags(t *testing.T) {
 	cmd := newKillCmd()
-	if cmd.Use != "kill <port|name>" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "kill <port|name>")
+	if cmd.Use != "kill <port|name> [more...]" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "kill <port|name> [more...]")
 	}
 	for _, name := range []string{"force", "single", "timeout"} {
 		if cmd.Flags().Lookup(name) == nil {
 			t.Errorf("missing flag %q", name)
 		}
+	}
+}
+
+// --- multi-target kill (Feature 4) -------------------------------------------
+
+func TestRunKillWith_MultiTargetPorts(t *testing.T) {
+	var out, errOut bytes.Buffer
+	killFn, calls := fakeKill(nil)
+	d := killDeps{
+		servers: []model.Server{
+			{Port: 3000, Source: model.SourceDocker, Name: "web-1"},
+			{Port: 5173, Source: model.SourceDocker, Name: "vite-1"},
+		},
+		kill:   killFn,
+		in:     strings.NewReader("y\n"),
+		out:    &out,
+		errOut: &errOut,
+	}
+	if err := runKillWith([]string{"3000", "5173"}, &killOpts{}, d); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(calls()) != 2 {
+		t.Errorf("kill called %d time(s), want 2", len(calls()))
+	}
+	if !strings.Contains(out.String(), `About to kill 2 target(s) matching "3000, 5173"`) {
+		t.Errorf("output = %q, want multi-target confirmation", out.String())
+	}
+}
+
+func TestRunKillWith_MultiTargetBogusFailsAllOrNothing(t *testing.T) {
+	var out, errOut bytes.Buffer
+	killFn, _ := fakeKill(nil)
+	d := killDeps{
+		servers: []model.Server{
+			{Port: 3000, Source: model.SourceDocker, Name: "web-1"},
+		},
+		kill:   killFn,
+		in:     strings.NewReader("y\n"),
+		out:    &out,
+		errOut: &errOut,
+	}
+	err := runKillWith([]string{"3000", "9999"}, &killOpts{}, d)
+	if err == nil {
+		t.Fatal("want error for the bogus target, got nil")
+	}
+	if !strings.Contains(err.Error(), `"9999"`) {
+		t.Errorf("err = %v, want it to mention the bogus target", err)
+	}
+}
+
+func TestRunKillWith_MultiTargetDuplicatePortsDeduped(t *testing.T) {
+	var out, errOut bytes.Buffer
+	killFn, calls := fakeKill(nil)
+	d := killDeps{
+		servers: []model.Server{
+			{Port: 3000, Source: model.SourceDocker, Name: "web-1"},
+		},
+		kill:   killFn,
+		in:     strings.NewReader("y\n"),
+		out:    &out,
+		errOut: &errOut,
+	}
+	if err := runKillWith([]string{"3000", "3000"}, &killOpts{force: true}, d); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(calls()) != 1 {
+		t.Errorf("kill called %d time(s), want 1 (deduped)", len(calls()))
+	}
+}
+
+func TestRunKillWith_MultiTargetNameAndPort(t *testing.T) {
+	var out, errOut bytes.Buffer
+	killFn, _ := fakeKill(nil)
+	d := killDeps{
+		servers: []model.Server{
+			{Port: 3000, Source: model.SourceDocker, Name: "web-1", Project: &model.Project{Name: "app"}},
+			{Port: 5432, Source: model.SourceDocker, Name: "app-db-1", Project: &model.Project{Name: "app"}},
+		},
+		kill:   killFn,
+		in:     strings.NewReader("n\n"),
+		out:    &out,
+		errOut: &errOut,
+	}
+	if err := runKillWith([]string{"3000", "app"}, &killOpts{}, d); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out.String(), `About to kill 2 target(s) matching "3000, app"`) {
+		t.Errorf("output = %q, want confirmation listing both targets", out.String())
+	}
+}
+
+func TestRunKillWith_MultiTargetFuzzy(t *testing.T) {
+	var out, errOut bytes.Buffer
+	killFn, _ := fakeKill(nil)
+	d := killDeps{
+		servers: []model.Server{
+			{Port: 3000, Source: model.SourceDocker, Name: "web-1"},
+			{Port: 3001, Source: model.SourceDocker, Name: "api-gateway"},
+		},
+		kill:   killFn,
+		in:     strings.NewReader("n\n"),
+		out:    &out,
+		errOut: &errOut,
+	}
+	err := runKillWith([]string{"3000", "gate"}, &killOpts{}, d)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out.String(), `No exact match for "3000, gate"`) {
+		t.Errorf("output = %q, want fuzzy confirmation", out.String())
 	}
 }
