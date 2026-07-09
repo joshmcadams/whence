@@ -14,6 +14,7 @@ import (
 	"github.com/joshmcadams/whence/internal/config"
 	"github.com/joshmcadams/whence/internal/kill"
 	"github.com/joshmcadams/whence/internal/model"
+	"github.com/joshmcadams/whence/internal/output"
 )
 
 type killOpts struct {
@@ -214,18 +215,21 @@ func confirmKill(units []model.Server, target string, fuzzy bool, opts kill.Opts
 func printPlan(p kill.Plan, out io.Writer) {
 	fmt.Fprintf(out, "  %s\n", describe(p.Server))
 	for _, line := range p.Lines() {
-		fmt.Fprintf(out, "      %s\n", line)
+		fmt.Fprintf(out, "      %s\n", output.Sanitize(line))
 	}
 }
 
+// describe renders a server for a confirmation/status line. The name and
+// container/process identifiers can embed process- or repo-controlled text,
+// so they're sanitized here — every caller gets a terminal-safe string.
 func describe(s model.Server) string {
-	name := s.DisplayName()
+	name := output.Sanitize(s.DisplayName())
 	if name == "" {
 		name = "(unknown)"
 	}
 	switch s.Source {
 	case model.SourceDocker:
-		return fmt.Sprintf(":%d %s [container %s]", s.Port, name, s.Name)
+		return fmt.Sprintf(":%d %s [container %s]", s.Port, name, output.Sanitize(s.Name))
 	default:
 		return fmt.Sprintf(":%d %s [pid %d]", s.Port, name, s.PID)
 	}

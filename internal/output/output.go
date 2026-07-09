@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -47,14 +48,14 @@ func Table(w io.Writer, servers []model.Server, hidden int) {
 	tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
 	fmt.Fprintln(tw, "PORT\tPROTO\tPID\tUPTIME\tSRC\tSERVER\tDESCRIPTION")
 	for _, s := range servers {
-		name := s.DisplayName()
+		name := Sanitize(s.DisplayName())
 		if name == "" {
 			name = "-"
 		}
 		if s.Exposure() == "all" {
 			name += " [!]"
 		}
-		desc := s.Description()
+		desc := Sanitize(s.Description())
 		if desc == "" {
 			desc = note(s)
 		}
@@ -63,14 +64,14 @@ func Table(w io.Writer, servers []model.Server, hidden int) {
 			pid = fmt.Sprint(s.PID)
 		}
 		fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\t%s\t%s\n",
-			s.Port, s.Proto, pid, HumanUptime(s.Uptime), SrcLabel(s.Source), name, Truncate(desc, 60))
+			s.Port, Sanitize(s.Proto), pid, HumanUptime(s.Uptime), SrcLabel(s.Source), name, Truncate(desc, 60))
 	}
 	tw.Flush()
 }
 
 func note(s model.Server) string {
 	if len(s.Notes) > 0 {
-		return "(" + s.Notes[0] + ")"
+		return "(" + Sanitize(s.Notes[0]) + ")"
 	}
 	return "-"
 }
@@ -95,6 +96,40 @@ func Truncate(s string, n int) string {
 		return string(r[:n])
 	}
 	return string(r[:n-1]) + "…"
+}
+
+// Sanitize makes an untrusted string safe to print to a terminal: C0 control
+// characters, DEL, and C1 control characters (0x80–0x9F, the range that
+// encodes CSI/OSC in 8-bit form) are replaced with '?'. Newlines and tabs are
+// replaced too — every render site here is single-line, and tabwriter treats
+// tabs as column separators. Content is sanitized at the render boundary
+// only; JSON output keeps raw values.
+func Sanitize(s string) string {
+	// Fast path: scan for offenders before allocating.
+	clean := true
+	for _, r := range s {
+		if isUnsafeRune(r) {
+			clean = false
+			break
+		}
+	}
+	if clean {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		if isUnsafeRune(r) {
+			b.WriteRune('?')
+		} else {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+func isUnsafeRune(r rune) bool {
+	return r < 0x20 || r == 0x7f || (r >= 0x80 && r <= 0x9f)
 }
 
 // HumanUptime renders a duration compactly: 45s, 12m, 3h17m, 2d4h.

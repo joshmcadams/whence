@@ -103,6 +103,47 @@ func TestTable_RendersRow(t *testing.T) {
 	}
 }
 
+func TestSanitize(t *testing.T) {
+	cases := []struct {
+		name string
+		s    string
+		want string
+	}{
+		{"plain ASCII unchanged", "hello world", "hello world"},
+		{"OSC title set neutralized", "\x1b]0;evil\x07", "?]0;evil?"},
+		{"CSI line-erase neutralized", "\x1b[2K\r", "?[2K?"},
+		{"C1 byte neutralized", "a\u009bb", "a?b"},
+		{"multi-byte UTF-8 passes through", "café — ✓", "café — ✓"},
+		{"newline and tab replaced", "a\nb\tc", "a?b?c"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := Sanitize(tc.s)
+			if got != tc.want {
+				t.Errorf("Sanitize(%q) = %q, want %q", tc.s, got, tc.want)
+			}
+			for _, r := range got {
+				if isUnsafeRune(r) {
+					t.Errorf("Sanitize(%q) = %q still contains unsafe rune %q", tc.s, got, r)
+				}
+			}
+		})
+	}
+}
+
+func TestTable_SanitizesEscapes(t *testing.T) {
+	servers := []model.Server{
+		{Port: 3000, Proto: "tcp", PID: 42, Source: model.SourceProcess,
+			Project: &model.Project{Name: "evil\x1b[8mname", Description: "desc\x1b]0;pwn\x07"}},
+	}
+	var buf bytes.Buffer
+	Table(&buf, servers, 0)
+	out := buf.String()
+	if strings.ContainsRune(out, 0x1b) {
+		t.Errorf("table output contains raw ESC:\n%q", out)
+	}
+}
+
 func TestJSON_LocksFieldContract(t *testing.T) {
 	servers := []model.Server{
 		{Port: 3000, Proto: "tcp", PID: 42, Source: model.SourceProcess, Uptime: 90 * time.Second},
