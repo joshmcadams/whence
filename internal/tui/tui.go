@@ -63,6 +63,10 @@ type Model struct {
 	err    error
 
 	width, height int
+
+	loadSeq    int  // last sequence number issued to a load command
+	appliedSeq int  // last sequence number applied to raw/rows
+	loading    bool // true while a load command is in flight
 }
 
 // New constructs the model.
@@ -77,7 +81,18 @@ func New(cfg config.Config, all bool) Model {
 	ti.Placeholder = "filter by name, port, or description"
 	ti.Prompt = "/"
 
-	m := Model{cfg: cfg, all: all, table: t, ti: ti, theme: ThemeByName(cfg.Theme)}
+	m := Model{
+		cfg: cfg, all: all, table: t, ti: ti, theme: ThemeByName(cfg.Theme),
+		// appliedSeq starts below any real sequence number (which starts at
+		// 0) so the very first loadedMsg — issued by hand at seq 0 from
+		// Init, see below — is never dropped as stale. loading starts true
+		// to match: Init always fires an initial load, but Init can't
+		// return the mutated Model (tea.Model.Init returns only a Cmd), so
+		// there is no other place to record "a load is in flight" for that
+		// first request.
+		appliedSeq: -1,
+		loading:    true,
+	}
 	m.applyTheme()
 	return m
 }
@@ -100,6 +115,7 @@ func (m Model) cycleTheme() Model {
 // --- messages & commands ----------------------------------------------------
 
 type loadedMsg struct {
+	seq     int
 	servers []pm.Server
 	err     error
 }
@@ -118,11 +134,25 @@ func persistThemeCmd(cfg config.Config) tea.Cmd {
 	}
 }
 
-func loadCmd(cfg config.Config) tea.Cmd {
+// loadCmd builds a load command stamped with seq; the caller is responsible
+// for making sure seq matches whatever the model will expect when the
+// resulting loadedMsg arrives (see nextLoadCmd and Init).
+func loadCmd(cfg config.Config, seq int) tea.Cmd {
 	return func() tea.Msg {
 		s, err := inventory.Collect(cfg)
-		return loadedMsg{servers: s, err: err}
+		return loadedMsg{seq: seq, servers: s, err: err}
 	}
+}
+
+// nextLoadCmd issues a freshly-stamped load: it bumps the sequence counter,
+// marks a load as in flight, and returns both the updated model and the
+// command. Bubble Tea's Update passes/returns Model by value, so callers
+// must use the returned model — exactly like the existing key/message
+// handlers already do.
+func (m Model) nextLoadCmd() (Model, tea.Cmd) {
+	m.loadSeq++
+	m.loading = true
+	return m, loadCmd(m.cfg, m.loadSeq)
 }
 
 func killCmd(s pm.Server, opts kill.Opts) tea.Cmd {
@@ -145,7 +175,11 @@ func tickCmd() tea.Cmd {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(loadCmd(m.cfg), tickCmd())
+	// Stamped by hand at seq 0 to match New()'s untouched loadSeq (Init
+	// cannot use nextLoadCmd: tea.Model.Init returns only a Cmd, so any
+	// mutation to a Model copy inside it would be discarded — New() already
+	// seeded loading=true to cover this first request).
+	return tea.Batch(loadCmd(m.cfg, 0), tickCmd())
 }
 
 // --- update -----------------------------------------------------------------
@@ -159,17 +193,34 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case loadedMsg:
+		if msg.seq <= m.appliedSeq {
+			// A slower, older snapshot arriving after a newer one already
+			// landed — applying it would roll the view back (e.g. a
+			// just-killed server reappearing). Drop it.
+			return m, nil
+		}
+		m.appliedSeq = msg.seq
+		if msg.seq == m.loadSeq {
+			// The newest-issued request just came back; no load remains
+			// in flight. An older-but-still-newest-applied message (from
+			// a request issued before the latest one) leaves loading true,
+			// since the latest request is still outstanding.
+			m.loading = false
+		}
 		m.err = msg.err
 		m.raw = msg.servers
 		m.rebuild()
 		return m, nil
 
 	case tickMsg:
-		// Pause auto-refresh while typing a filter so the list doesn't jump.
-		if m.mode == modeFilter {
+		// Pause auto-refresh while typing a filter so the list doesn't jump,
+		// and skip it entirely while a previous load is still in flight so
+		// collects can't stack up unbounded.
+		if m.mode == modeFilter || m.loading {
 			return m, tickCmd()
 		}
-		return m, tea.Batch(loadCmd(m.cfg), tickCmd())
+		nm, loadC := m.nextLoadCmd()
+		return nm, tea.Batch(loadC, tickCmd())
 
 	case killedMsg:
 		if msg.res.Err != nil {
@@ -177,7 +228,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.status = okStyle.Render("✓ killed " + describe(msg.res.Server))
 		}
-		return m, loadCmd(m.cfg) // refresh immediately
+		nm, loadC := m.nextLoadCmd()
+		return nm, loadC // refresh immediately
 
 	case themeSavedMsg:
 		if msg.err != nil {
@@ -255,7 +307,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case "r":
 		m.status = ""
-		return m, loadCmd(m.cfg)
+		nm, loadC := m.nextLoadCmd()
+		return nm, loadC
 	case "a":
 		m.all = !m.all
 		m.rebuild()

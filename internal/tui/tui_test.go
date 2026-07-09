@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -312,5 +313,95 @@ func TestKilledMsgErrorSetsStatus(t *testing.T) {
 	}
 	if !strings.Contains(m2.status, "nope") {
 		t.Errorf("status = %q, want it to contain the error message 'nope'", m2.status)
+	}
+}
+
+// TestLoadedMsgDropsStaleSnapshot guards the refresh-integrity invariant: a
+// slower, older collect landing after a faster, newer one must not roll the
+// view back (e.g. a just-killed server reappearing).
+func TestLoadedMsgDropsStaleSnapshot(t *testing.T) {
+	m := New(config.Config{ConfidenceThreshold: 50}, true) // all=true: nothing filtered out
+	m = step(m, tea.WindowSizeMsg{Width: 100, Height: 24})
+
+	m, _ = m.nextLoadCmd() // seq 1
+	m, _ = m.nextLoadCmd() // seq 2
+
+	a := pm.Server{Port: 1111, Proto: "tcp", Source: pm.SourceProcess, Confidence: 100}
+	b := pm.Server{Port: 2222, Proto: "tcp", Source: pm.SourceProcess, Confidence: 100}
+	c := pm.Server{Port: 3333, Proto: "tcp", Source: pm.SourceProcess, Confidence: 100}
+
+	m = step(m, loadedMsg{seq: 2, servers: []pm.Server{a, b}}) // fast, newer collect lands first
+	m = step(m, loadedMsg{seq: 1, servers: []pm.Server{c}})    // slow, older collect lands late
+
+	if len(m.rows) != 2 {
+		t.Fatalf("rows = %d, want 2 (the seq=2 snapshot); stale seq=1 must not have applied", len(m.rows))
+	}
+	ports := map[int]bool{}
+	for _, r := range m.rows {
+		ports[r.Port] = true
+	}
+	if !ports[1111] || !ports[2222] {
+		t.Errorf("rows = %+v, want ports 1111 and 2222 from the seq=2 snapshot", m.rows)
+	}
+}
+
+// TestLoadedMsgKeepsLoadingWhileNewerRequestOutstanding pins the exact
+// semantics of Step 1: an older-but-newest-applied message is still applied
+// (it's the freshest data seen so far), but must NOT clear m.loading, since
+// a newer request (the one that will supersede it) is still in flight.
+func TestLoadedMsgKeepsLoadingWhileNewerRequestOutstanding(t *testing.T) {
+	m := New(config.Config{ConfidenceThreshold: 50}, true)
+	m = step(m, tea.WindowSizeMsg{Width: 100, Height: 24})
+
+	m, _ = m.nextLoadCmd() // seq 1
+	m, _ = m.nextLoadCmd() // seq 2 — the newest-issued request, still outstanding
+
+	a := pm.Server{Port: 1111, Proto: "tcp", Source: pm.SourceProcess, Confidence: 100}
+	m = step(m, loadedMsg{seq: 1, servers: []pm.Server{a}}) // the older request returns first
+
+	if !m.loading {
+		t.Error("m.loading = false, want true: seq=2 is still outstanding")
+	}
+	if len(m.rows) != 1 || m.rows[0].Port != 1111 {
+		t.Errorf("rows = %+v, want the seq=1 snapshot applied (it's newer than anything applied so far)", m.rows)
+	}
+}
+
+// TestTickSkipsLoadWhileLoading guards against unbounded collect stacking:
+// a tick that fires while a previous load is still in flight must not issue
+// another one.
+func TestTickSkipsLoadWhileLoading(t *testing.T) {
+	m := newLoaded()
+	m.loading = true
+	before := m.loadSeq
+	m = step(m, tickMsg(time.Now()))
+	if m.loadSeq != before {
+		t.Errorf("loadSeq = %d, want unchanged at %d (tick must not load while m.loading)", m.loadSeq, before)
+	}
+}
+
+// TestTickLoadsWhenIdle is the counterpart: once no load is in flight, the
+// tick must resume issuing loads.
+func TestTickLoadsWhenIdle(t *testing.T) {
+	m := newLoaded()
+	if m.loading {
+		t.Fatal("precondition: m.loading should be false after the initial load applied")
+	}
+	before := m.loadSeq
+	m = step(m, tickMsg(time.Now()))
+	if m.loadSeq != before+1 {
+		t.Errorf("loadSeq = %d, want %d (tick should issue a load while idle)", m.loadSeq, before+1)
+	}
+}
+
+// TestManualRefreshAlwaysLoads ensures 'r' loads even while an
+// auto-refresh is in flight — user intent wins over the tick guard.
+func TestManualRefreshAlwaysLoads(t *testing.T) {
+	m := newLoaded()
+	m.loading = true
+	before := m.loadSeq
+	m = step(m, key("r"))
+	if m.loadSeq != before+1 {
+		t.Errorf("loadSeq = %d, want %d ('r' must load even while m.loading)", m.loadSeq, before+1)
 	}
 }
