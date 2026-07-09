@@ -40,9 +40,15 @@ Untrusted strings reach the terminal at these places:
   `s.Description()` (via `Truncate`), and `s.Proto` raw with `fmt.Fprintf`.
 - `internal/output/output.go:71-76` — `note(s)` prints `s.Notes[0]` raw
   (notes embed error strings that can contain process-controlled text).
-- `internal/cli/kill.go:190-208` — `printPlan`/`describe` print
-  `p.Lines()` (which embed `TreeMember.Name`, a process name) and
-  `s.DisplayName()`/`s.Name` raw.
+- `internal/cli/kill.go:214-231` — `printPlan(p kill.Plan, out io.Writer)`/
+  `describe(s model.Server) string` print `p.Lines()` (which embed
+  `TreeMember.Name`, a process name) and `s.DisplayName()`/`s.Name` raw.
+  **Reconciled 2026-07-09**: plan 001 (already merged) extracted an
+  `io.Writer out` parameter into `printPlan` and threaded `d.out`/`d.in`
+  through `runKillWith` — `printPlan` already writes via `fmt.Fprintf(out, ...)`,
+  not `fmt.Printf`. This plan's job is unchanged (wrap the values in
+  `Sanitize` before they reach those `Fprintf` calls); only the call shape
+  moved. `describe` is unaffected (still returns a plain string; no writer).
 - `internal/kill/kill.go:100-121` — `Plan.Lines()` builds those strings from
   `m.Name` (do NOT sanitize here; sanitize at render, see design note).
 - `internal/tui/tui.go:315-327` — `rebuild()` builds table rows from
@@ -53,8 +59,9 @@ Untrusted strings reach the terminal at these places:
   `s.Exe`, `s.Cwd`, `DisplayName()`, `Description()`, `Project.Root`.
 - `internal/tui/tui.go:363-371` — `headerView` renders `m.query` (user-typed,
   low risk) and `m.err.Error()` (can embed scan-derived text).
-- `internal/tui/tui.go:176-178` and `internal/cli/kill.go:89` — kill status
-  lines embed `describe(...)` and error text.
+- `internal/tui/tui.go:176-178` and `internal/cli/kill.go:113,115` (inside
+  `runKillWith`, writing to `d.out`) — kill status lines embed `describe(...)`
+  and error text.
 
 There is no sanitization anywhere in the repo (verified by reading all render
 paths). Design note: sanitize at the **render boundary**, not in `model` or
@@ -146,7 +153,15 @@ well: drop the `r != '\t'` exception. Final predicate:
   `s.DisplayName()` result before appending), `desc`, `s.Proto`, and the
   `note(s)` return value in `Sanitize`.
 - `internal/cli/kill.go`: in `describe`, sanitize `name` and `s.Name`; in
-  `printPlan`, sanitize each `line` from `p.Lines()`.
+  `printPlan(p kill.Plan, out io.Writer)`, sanitize each `line` from
+  `p.Lines()` before the existing `fmt.Fprintf(out, ...)` call (the writer
+  parameter already exists post-plan-001 — do not add a second one). Also
+  sanitize `describe(s)`'s output at its two call sites inside `runKillWith`
+  (the `✗ ...`/`✓ killed ...` lines, kill.go:113,115) — simplest is to
+  sanitize inside `describe` itself, which is out-of-scope for the CLI/TUI
+  `describe` twins per plan 014 but sanitizing INSIDE `describe` here is fine
+  since `describe` returns a plain string with no wording change, only
+  content-safety.
 
 ### Step 3: Apply at the TUI render boundaries
 
@@ -176,9 +191,11 @@ is fine, but do not create a second sanitizer implementation.
   neutralized; multi-byte UTF-8 (e.g. `"café — ✓"`) passes through unchanged;
   embedded `\n`/`\t` replaced. Plus one `Table` test: a server whose
   DisplayName contains `\x1b[8m` renders a table containing no `\x1b`.
-- `internal/cli/kill_test.go`: reuse plan 001's `runKillWith` harness (if
-  landed) or test `describe` directly: a server named `"web\x1b[1A"` renders
-  with no escape byte.
+- `internal/cli/kill_test.go`: plan 001 has landed, so `runKillWith`'s
+  `killDeps{..., out: &buf, in: ...}` harness already exists — reuse it (a
+  docker-source fixture named `"web\x1b[1A"`, assert the captured `out`
+  buffer contains no `\x1b`), or test `describe` directly with the same
+  fixture; either is fine.
 - `internal/tui/tui_test.go`: pump a `loadedMsg` containing a server with an
   escape in its description; assert `m.View()` (or the built rows) contains
   no `\x1b` **originating from content** — note the View itself contains
