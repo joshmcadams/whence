@@ -28,7 +28,7 @@ Repo ground rules that apply to EVERY plan (from `AGENTS.md`):
 | 007 | Toolchain/CI cluster: go directive, pinned lint, gofmt enforcement, govulncheck | P1 | S | — | DONE |
 | 008 | Reconcile stale docs: backlog, DESIGN.md, README, phase comments, kill-climb caveat | P2 | S | 007 | DONE |
 | 009 | TUI refresh integrity: in-flight guard + snapshot generation counter | P2 | S | — | DONE |
-| 010 | Harden attribution inputs: bounded file reads, compose workdir validation, `--` separators | P2 | S | — | TODO |
+| 010 | Harden attribution inputs: bounded file reads, compose workdir validation, `--` separators | P2 | S | — | DONE |
 | 011 | Release pipeline hardening: CI permissions, SHA-pinned actions, reproducible releases | P2 | S | — | TODO |
 | 012 | Stable sorts and `--watch` input validation | P2 | S | — | TODO |
 | 013 | Remaining test seams: TUI preview, classify orchestration, CLI layer | P2 | M | 001 | TODO |
@@ -250,6 +250,33 @@ in different packages and don't conflict. Everything touching `internal/tui/tui.
   `Init` never touches). Three uncached re-runs (25/25 tests passing, up
   from 20), full lint/test gate, and `git status` cleanliness all
   independently confirmed.
+
+- **010 — DONE.** Real drift across all three drift-checked files (plans
+  001/002/004/006 all touched them since `caec51a`) — reconciled before
+  dispatch: `dockerStop`'s call now goes through plan 001's `dockerCombinedOutput`
+  seam (the executor was told to insert `--` there, not revert to calling
+  `execx.CombinedOutput` directly, which would have silently removed the test
+  seam); two existing test assertions needed updating; `project.go`'s reader
+  functions shifted 1-2 lines from plan 004's unrelated fix. Executed in
+  worktree branch `worktree-agent-a33b79da4f8e43eea` (commit branch
+  `advisor/010-attribution-hardening`), reviewed and approved 2026-07-09.
+  Added bounded, regular-file-only reads (`readSmallFile`) for all four
+  manifest/README readers; added `isLocalDir` to require a compose
+  `working_dir` label resolve to a real directory before granting
+  attribution; added `--` separators to both docker invocations. One
+  interaction required real judgment: plan 006's `TestInspectJSONContract`
+  fixture uses a hardcoded, nonexistent `working_dir`, so this plan's new
+  `isLocalDir` check flips that test's expected result — the executor
+  updated it to match the new-and-correct behavior while preserving its
+  original JSON-tag-parsing purpose (added an assertion the label still
+  parses) rather than weakening the new check; reviewer verified the fixture
+  path is genuinely nonexistent and judged this an appropriate fix, not
+  corner-cutting. Reviewer independently timed the FIFO-rejection test
+  (completes in ~4ms, proving the Lstat guard fires before any blocking
+  read) and reproduced real compose attribution against this machine's two
+  actual running containers to confirm the new validation doesn't break
+  real-world usage. Three uncached re-runs, full lint/test gate, and
+  `git status` cleanliness all independently confirmed.
 
 ## Findings considered and rejected (do not re-audit)
 
