@@ -439,7 +439,30 @@ func TestRunKillWith_MultiTargetFuzzy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out.String(), `No exact match for "3000, gate"`) {
-		t.Errorf("output = %q, want fuzzy confirmation", out.String())
+	// 3000 matched exactly; only "gate" was a substring match — the prompt
+	// must not claim there was no exact match for the whole target list.
+	if !strings.Contains(out.String(), `About to kill 2 target(s) matching "3000, gate" (substring match for "gate")`) {
+		t.Errorf("output = %q, want mixed exact/substring confirmation", out.String())
+	}
+}
+
+func TestRunKillWith_MultiTargetAllFuzzy(t *testing.T) {
+	var out, errOut bytes.Buffer
+	killFn, _ := fakeKill(nil)
+	d := killDeps{
+		servers: []model.Server{
+			{Port: 3000, Source: model.SourceDocker, Name: "web-1"},
+			{Port: 3001, Source: model.SourceDocker, Name: "api-gateway"},
+		},
+		kill:   killFn,
+		in:     strings.NewReader("n\n"),
+		out:    &out,
+		errOut: &errOut,
+	}
+	if err := runKillWith([]string{"we", "gate"}, &killOpts{}, d); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out.String(), `No exact match for "we, gate"`) {
+		t.Errorf("output = %q, want all-fuzzy confirmation", out.String())
 	}
 }

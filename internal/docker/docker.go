@@ -27,14 +27,28 @@ const (
 // healthy daemon (e.g. the first query after boot) without dropping results.
 const dockerTimeout = 5 * time.Second
 
-// Runtime returns the container CLI to use: docker when present, else
-// podman (CLI-compatible for the ps/inspect/stop calls whence makes).
-// Empty string when neither exists.
-func Runtime() string {
+// lookPath seams binary resolution so tests can simulate which container
+// CLIs are installed. LookPath spawns no child process, so this is the one
+// sanctioned direct os/exec use.
+var lookPath = exec.LookPath
+
+// Runtimes returns the available container CLIs in preference order: docker
+// first, then podman (CLI-compatible for the ps/inspect/stop calls whence
+// makes). Empty when neither is on PATH.
+func Runtimes() []string {
+	var bins []string
 	for _, bin := range []string{"docker", "podman"} {
-		if _, err := exec.LookPath(bin); err == nil {
-			return bin
+		if _, err := lookPath(bin); err == nil {
+			bins = append(bins, bin)
 		}
+	}
+	return bins
+}
+
+// Runtime returns the preferred container CLI, or "" when none exists.
+func Runtime() string {
+	if bins := Runtimes(); len(bins) > 0 {
+		return bins[0]
 	}
 	return ""
 }
@@ -65,11 +79,23 @@ type inspect struct {
 // container. Kubernetes-managed containers (io.kubernetes.* labels or k8s_*
 // names) are skipped as infrastructure. If docker is unavailable, returns nil.
 func Servers() ([]model.Server, error) {
-	bin := Runtime()
-	if bin == "" {
+	bins := Runtimes()
+	if len(bins) == 0 {
 		return nil, nil
 	}
+	bin := bins[0]
 	ids, err := runningIDs(bin)
+	// PATH presence isn't health: a docker CLI with a dead daemon on a podman
+	// box must not hide podman's containers. When the preferred runtime can't
+	// answer, fall through to the next one that can.
+	for _, alt := range bins[1:] {
+		if err == nil {
+			break
+		}
+		if altIDs, altErr := runningIDs(alt); altErr == nil {
+			bin, ids, err = alt, altIDs, nil
+		}
+	}
 	if err != nil || len(ids) == 0 {
 		return nil, err
 	}

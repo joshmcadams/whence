@@ -87,4 +87,7 @@ podman), and `podman stop` exit behaviour are what must be verified.
 - On a podman-only box: `whence list` shows compose-attributed containers,
   `whence kill` stops them, and `whence doctor` reports the runtime.
 - The docker-first priority still works (if someone installs `docker` on a
-  podman box, docker is used).
+  podman box, docker is used) — but when the docker CLI is present with a dead
+  daemon, `docker.Servers` and `kill.dockerStop` fall through to podman.
+  Verify that path too: with both CLIs installed and only podman's containers
+  running, `whence list` shows them and `whence kill` stops them.

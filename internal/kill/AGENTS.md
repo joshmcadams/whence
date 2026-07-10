@@ -41,8 +41,9 @@ inline a `runtime.GOOS` branch; use the per-OS file.
 
 ## Invariant 3 — docker is a separate backend
 
-`Source == SourceDocker` servers are stopped with `docker stop -t`, never a host
-signal. `Single` does not apply to them.
+`Source == SourceDocker` servers are stopped with `docker stop -t` (or `podman
+stop -t` — `dockerStop` tries each CLI from `docker.Runtimes()` in order until
+one succeeds), never a host signal. `Single` does not apply to them.
 
 ## Preview and kill must agree
 

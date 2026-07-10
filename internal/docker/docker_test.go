@@ -197,6 +197,62 @@ func withDockerOutput(t *testing.T, fn func(timeout time.Duration, name string, 
 	t.Cleanup(func() { dockerOutput = orig })
 }
 
+func withLookPath(t *testing.T, fn func(string) (string, error)) {
+	orig := lookPath
+	lookPath = fn
+	t.Cleanup(func() { lookPath = orig })
+}
+
+func TestServers_FallsBackToPodmanWhenDockerQueryFails(t *testing.T) {
+	withLookPath(t, func(bin string) (string, error) { return "/usr/bin/" + bin, nil })
+
+	var calls []string
+	withDockerOutput(t, func(timeout time.Duration, name string, args ...string) ([]byte, error) {
+		calls = append(calls, name+" "+args[0])
+		if name == "docker" {
+			return nil, errors.New("cannot connect to the Docker daemon")
+		}
+		if args[0] == "ps" {
+			return []byte("abc123\n"), nil
+		}
+		return []byte(`[{"Name":"/web-1","Config":{"Image":"nginx"},"NetworkSettings":{"Ports":{"80/tcp":[{"HostIp":"0.0.0.0","HostPort":"8080"}]}}}]`), nil
+	})
+
+	servers, err := Servers()
+	if err != nil {
+		t.Fatalf("err = %v, want nil (podman fallback)", err)
+	}
+	if len(servers) != 1 || servers[0].Port != 8080 || servers[0].Name != "web-1" {
+		t.Fatalf("servers = %+v, want one web-1 row on :8080", servers)
+	}
+	want := []string{"docker ps", "podman ps", "podman inspect"}
+	if len(calls) != len(want) {
+		t.Fatalf("calls = %v, want %v", calls, want)
+	}
+	for i := range want {
+		if calls[i] != want[i] {
+			t.Errorf("calls[%d] = %q, want %q", i, calls[i], want[i])
+		}
+	}
+}
+
+func TestServers_NoRuntimesReturnsNil(t *testing.T) {
+	withLookPath(t, func(string) (string, error) { return "", errors.New("not found") })
+	called := false
+	withDockerOutput(t, func(timeout time.Duration, name string, args ...string) ([]byte, error) {
+		called = true
+		return nil, nil
+	})
+
+	servers, err := Servers()
+	if servers != nil || err != nil {
+		t.Errorf("Servers() = %v, %v, want nil, nil", servers, err)
+	}
+	if called {
+		t.Error("no runtime on PATH must not spawn a container CLI call")
+	}
+}
+
 func TestInspectAll_PartialSuccessOnNonZeroExit(t *testing.T) {
 	// docker inspect exits 1 because one id vanished, but still printed the
 	// JSON array of the containers it did find on stdout.

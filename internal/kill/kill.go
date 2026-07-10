@@ -28,6 +28,7 @@ var (
 	forceKillPID         = forceKill
 	pidAlive             = isAlive
 	dockerCombinedOutput = execx.CombinedOutput
+	containerRuntimes    = docker.Runtimes
 	processCreateTime    = createTime
 )
 
@@ -156,6 +157,7 @@ func (p Plan) Lines() []string {
 // errNoPID is returned when a native server has no accessible pid.
 var errNoPID = errors.New("no accessible pid (owned by another user; try elevated privileges)")
 
+// launchers are wrapper processes we will climb through to find the tree head.
 // Shells (bash/zsh/sh/fish/pwsh/cmd) are deliberately absent: climbing stops at
 // them so an interactive session is never killed.
 //
@@ -245,14 +247,22 @@ func dockerStop(s model.Server, o Opts) Result {
 	// bound the CLI call itself beyond that so a wedged daemon can't hang the
 	// kill forever.
 	timeout := time.Duration(secs)*time.Second + 10*time.Second
-	bin := docker.Runtime()
-	if bin == "" {
-		bin = "docker" // unreachable in practice; keeps the error message sane
+	bins := containerRuntimes()
+	if len(bins) == 0 {
+		bins = []string{"docker"} // unreachable in practice; keeps the error message sane
 	}
-	if out, err := dockerCombinedOutput(timeout, bin, "stop", "-t", strconv.Itoa(secs), "--", s.Name); err != nil {
-		return Result{Server: s, Method: "docker stop", Err: fmt.Errorf("%w: %s", err, out)}
+	// A container discovered via one runtime can't be stopped by the other,
+	// so on failure fall through to the next available CLI (docker-first,
+	// mirroring docker.Servers).
+	var out []byte
+	var err error
+	for _, bin := range bins {
+		out, err = dockerCombinedOutput(timeout, bin, "stop", "-t", strconv.Itoa(secs), "--", s.Name)
+		if err == nil {
+			return Result{Server: s, Killed: true, Method: "docker stop"}
+		}
 	}
-	return Result{Server: s, Killed: true, Method: "docker stop"}
+	return Result{Server: s, Method: "docker stop", Err: fmt.Errorf("%w: %s", err, out)}
 }
 
 // --- process table helpers --------------------------------------------------

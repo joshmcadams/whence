@@ -3,11 +3,25 @@ package cli
 import (
 	"bytes"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 
 	"github.com/joshmcadams/whence/internal/config"
 )
+
+// setEditor points --edit at a stub editor for the test, clearing $VISUAL so
+// the dev box's real editor can't take precedence, and skips when the stub
+// binary isn't on PATH (e.g. Windows has no true/false).
+func setEditor(t *testing.T, editor string) {
+	t.Helper()
+	bin := strings.Fields(editor)[0]
+	if _, err := exec.LookPath(bin); err != nil {
+		t.Skipf("%s not on PATH; skipping", bin)
+	}
+	t.Setenv("VISUAL", "")
+	t.Setenv("EDITOR", editor)
+}
 
 func TestConfigInit_WritesFile(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
@@ -88,7 +102,7 @@ func TestConfigEdit_InitAndEditExclusive(t *testing.T) {
 
 func TestConfigEdit_CreatesWhenAbsent(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	t.Setenv("EDITOR", "true")
+	setEditor(t, "true")
 
 	var out bytes.Buffer
 	if err := runConfig(&out, false, true); err != nil {
@@ -108,7 +122,7 @@ func TestConfigEdit_EditorError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("save: %v", err)
 	}
-	t.Setenv("EDITOR", "false")
+	setEditor(t, "false")
 
 	err = runConfig(new(bytes.Buffer), false, true)
 	if err == nil {
@@ -116,5 +130,16 @@ func TestConfigEdit_EditorError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "exited with error") {
 		t.Errorf("err = %q, want 'exited with error'", err.Error())
+	}
+}
+
+func TestConfigEdit_EditorWithArguments(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	// Regression: an $EDITOR carrying arguments (the "code --wait" shape) must
+	// be split into binary + args, not treated as one binary name.
+	setEditor(t, "true --wait")
+
+	if err := runConfig(new(bytes.Buffer), false, true); err != nil {
+		t.Fatalf("EDITOR with arguments should work: %v", err)
 	}
 }

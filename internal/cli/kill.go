@@ -91,14 +91,16 @@ func runKill(targets []string, o *killOpts) error {
 
 func runKillWith(targets []string, o *killOpts, d killDeps) error {
 	var matches []model.Server
-	fuzzy := false
+	var fuzzyTargets []string
 	for _, target := range targets {
 		m, f := matchTargets(d.servers, target)
 		if len(m) == 0 {
 			return fmt.Errorf("no server found matching %q", target)
 		}
 		matches = append(matches, m...)
-		fuzzy = fuzzy || f
+		if f {
+			fuzzyTargets = append(fuzzyTargets, target)
+		}
 	}
 	units := dedupeUnits(matches)
 
@@ -125,7 +127,7 @@ func runKillWith(targets []string, o *killOpts, d killDeps) error {
 
 	// Confirm unless forced, previewing the full tree each kill will signal.
 	if !o.force {
-		if !confirmKill(units, targets, fuzzy, opts, d.out, d.in) {
+		if !confirmKill(units, targets, fuzzyTargets, opts, d.out, d.in) {
 			fmt.Fprintln(d.out, "Aborted.")
 			return nil
 		}
@@ -200,8 +202,10 @@ func dedupeUnits(servers []model.Server) []model.Server {
 // confirmKill previews the actual process tree each kill will signal — not just
 // the listening pid — then asks for confirmation. Because a kill climbs to a
 // launcher and takes the whole subtree, one listening server can mean several
-// processes; the user sees them all before agreeing.
-func confirmKill(units []model.Server, targets []string, fuzzy bool, opts kill.Opts, out io.Writer, in io.Reader) bool {
+// processes; the user sees them all before agreeing. fuzzyTargets names the
+// targets that matched only by substring, so the prompt never claims an exact
+// target was fuzzy (or vice versa).
+func confirmKill(units []model.Server, targets, fuzzyTargets []string, opts kill.Opts, out io.Writer, in io.Reader) bool {
 	plans := kill.PreviewBatch(units, opts)
 	totalProcs := 0
 	for _, p := range plans {
@@ -209,9 +213,16 @@ func confirmKill(units []model.Server, targets []string, fuzzy bool, opts kill.O
 	}
 
 	targetStr := strings.Join(targets, ", ")
-	if fuzzy {
+	switch {
+	case len(fuzzyTargets) == len(targets):
 		fmt.Fprintf(out, "No exact match for %q; %d server(s) contain it", targetStr, len(units))
-	} else {
+	case len(fuzzyTargets) > 0:
+		quoted := make([]string, len(fuzzyTargets))
+		for i, ft := range fuzzyTargets {
+			quoted[i] = strconv.Quote(ft)
+		}
+		fmt.Fprintf(out, "About to kill %d target(s) matching %q (substring match for %s)", len(units), targetStr, strings.Join(quoted, ", "))
+	default:
 		fmt.Fprintf(out, "About to kill %d target(s) matching %q", len(units), targetStr)
 	}
 	if totalProcs > 0 {

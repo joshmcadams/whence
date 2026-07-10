@@ -24,7 +24,7 @@ func newConfigCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&doInit, "init", false, "write a default config file to the config path")
-	cmd.Flags().BoolVar(&doEdit, "edit", false, "open the config file in $VISUAL/$EDITOR (single binary name; falls back to vi/notepad)")
+	cmd.Flags().BoolVar(&doEdit, "edit", false, "open the config file in $VISUAL/$EDITOR (arguments allowed, e.g. \"code --wait\"; falls back to vi/notepad)")
 	return cmd
 }
 
@@ -63,15 +63,19 @@ func runConfig(out io.Writer, doInit, doEdit bool) error {
 
 func runEditConfig(out io.Writer) error {
 	path := config.Path()
-	if _, err := os.Stat(path); err != nil {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
 		if _, err := config.Save(config.Default()); err != nil {
 			return err
 		}
 		fmt.Fprintln(out, "wrote default config to", path)
+	} else if err != nil {
+		return err
 	}
-	editor := resolveEditor()
-	if err := execx.Interactive(editor, path); err != nil {
-		return fmt.Errorf("editor %q exited with error: %w", editor, err)
+	// $VISUAL/$EDITOR may carry arguments (e.g. "code --wait"); split on
+	// whitespace, the convention CLIs follow short of a full shell parse.
+	editor := strings.Fields(resolveEditor())
+	if err := execx.Interactive(editor[0], append(editor[1:], path)...); err != nil {
+		return fmt.Errorf("editor %q exited with error: %w", strings.Join(editor, " "), err)
 	}
 	cfg, err := config.Load()
 	if err != nil {

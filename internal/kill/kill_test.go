@@ -231,17 +231,21 @@ func TestPreviewBoth_NoPIDReturnsMatchingFlagPairs(t *testing.T) {
 //
 // saveKillSeams snapshots the package-level seam vars and restores them on
 // cleanup, so each test can freely reassign takeSnapshot/terminatePID/
-// forceKillPID/pidAlive/dockerCombinedOutput without leaking into other tests.
+// forceKillPID/pidAlive/dockerCombinedOutput/containerRuntimes without
+// leaking into other tests. containerRuntimes is also pinned to "docker"
+// so a podman install on the dev box can't change test behavior.
 func saveKillSeams(t *testing.T) {
 	t.Helper()
-	origSnap, origTerm, origForce, origAlive, origDocker, origCreateTime :=
-		takeSnapshot, terminatePID, forceKillPID, pidAlive, dockerCombinedOutput, processCreateTime
+	origSnap, origTerm, origForce, origAlive, origDocker, origRuntimes, origCreateTime :=
+		takeSnapshot, terminatePID, forceKillPID, pidAlive, dockerCombinedOutput, containerRuntimes, processCreateTime
+	containerRuntimes = func() []string { return []string{"docker"} }
 	t.Cleanup(func() {
 		takeSnapshot = origSnap
 		terminatePID = origTerm
 		forceKillPID = origForce
 		pidAlive = origAlive
 		dockerCombinedOutput = origDocker
+		containerRuntimes = origRuntimes
 		processCreateTime = origCreateTime
 	})
 }
@@ -601,6 +605,27 @@ func TestDockerStop_FailurePropagatesOutputAndError(t *testing.T) {
 	}
 	if res.Err == nil || !strings.Contains(res.Err.Error(), "exit 1") || !strings.Contains(res.Err.Error(), "boom") {
 		t.Errorf("Err = %v, want it to contain both %q and %q", res.Err, "exit 1", "boom")
+	}
+}
+
+func TestDockerStop_FallsBackToPodmanWhenDockerFails(t *testing.T) {
+	saveKillSeams(t)
+	containerRuntimes = func() []string { return []string{"docker", "podman"} }
+	var bins []string
+	dockerCombinedOutput = func(timeout time.Duration, name string, args ...string) ([]byte, error) {
+		bins = append(bins, name)
+		if name == "docker" {
+			return []byte("Error: No such container: web-1"), errors.New("exit 1")
+		}
+		return []byte("web-1"), nil
+	}
+
+	res := Server(model.Server{Source: model.SourceDocker, Name: "web-1"}, Opts{})
+	if res.Err != nil || !res.Killed {
+		t.Fatalf("Killed=%v Err=%v, want podman fallback to succeed", res.Killed, res.Err)
+	}
+	if !reflect.DeepEqual(bins, []string{"docker", "podman"}) {
+		t.Errorf("binaries tried = %v, want [docker podman]", bins)
 	}
 }
 
